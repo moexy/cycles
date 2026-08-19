@@ -2,10 +2,35 @@
 .DS_Store
 Thumbs.db
 
-# Build & Dependency Artifacts
-node_modules/
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Build & Distribution
 dist/
 build/
+*.egg-info/
+.eggs/
+
+# Testing & Tooling Caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local artifacts and outputs
+runs/
+overlays/
+heatmaps/
+*.pt
+*.pth
+*.mat
+
+# Environment & Logs
 .env
 .env.local
 *.log
