@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn>=1.4.0",
     "scikit-image>=0.22.0",
     "ultralytics>=8.1.0",
+    "opencv-python>=4.8.0",
 ]
 
 [project.optional-dependencies]

@@ -22,60 +22,71 @@ class CellClassifier:
         profile: CellProfile,
         nuclear_to_cytoplasmic_ratio: float = 0.0,
     ) -> tuple[CellType, float]:
-        """Return a cell type and confidence from morphology and intensity spread.
-
-        ``nuclear_to_cytoplasmic_ratio`` is supplied by the detector because the
-        compact shared ``CellProfile`` stores summary intensity statistics only.
-        """
-        if (
-            profile.predicted_type != CellType.DEBRIS
-            and profile.confidence >= self.trust_yolo_confidence
-        ):
-            return profile.predicted_type, profile.confidence
-
+        """Return a cell type and confidence from morphology and intensity spread."""
         area = profile.area
         circularity = profile.circularity
         aspect_ratio = profile.aspect_ratio
         nuclear_ratio = float(np.clip(nuclear_to_cytoplasmic_ratio, 0.0, 1.0))
         intensity_cv = profile.std_intensity / max(profile.mean_intensity, 1.0)
+        initial_type = profile.predicted_type
 
-        if area < 15.0 or aspect_ratio > 4.5 or circularity < 0.10:
+        if area < 15.0 or aspect_ratio > 5.0 or circularity < 0.08:
             return CellType.DEBRIS, 0.90
 
-        # Small round, optically dense cells are predominantly leukocytes. A
-        # uniformly dark candidate is retained because a leukocyte can be almost
-        # entirely occupied by its nucleus.
-        if area <= 450.0 and circularity >= 0.55 and aspect_ratio <= 1.9:
-            nuclear_evidence = nuclear_ratio >= 0.22 or profile.mean_intensity <= 125.0
-            confidence = 0.68 + 0.18 * circularity + (0.10 if nuclear_evidence else 0.0)
-            return CellType.LEUKOCYTE, min(confidence, 0.98)
+        # 1. Biological verification for upstream (YOLO/detector) predictions
+        if initial_type != CellType.DEBRIS and profile.confidence >= self.trust_yolo_confidence:
+            # Guardrail: Small dense objects cannot be cornified squamous cells
+            if initial_type == CellType.CORNIFIED_SQUAMOUS and area <= 450.0:
+                if nuclear_ratio >= 0.20 or profile.mean_intensity <= 130.0:
+                    return CellType.LEUKOCYTE, 0.88
+                return CellType.DEBRIS, 0.70
 
-        # Large, irregular, low-variance and anucleate sheets are cornified.
-        if area >= 1500.0:
-            anucleate = nuclear_ratio < 0.10
-            irregular = circularity < 0.68 or aspect_ratio > 1.55
-            homogeneous = intensity_cv < 0.22
-            if anucleate or irregular or (area >= 2800.0 and homogeneous):
-                confidence = 0.66 + min(area / 12000.0, 0.14)
-                confidence += 0.10 * (1.0 - circularity) + (0.07 if anucleate else 0.0)
+            # Guardrail: Intermediate cells with prominent nucleus are nucleated epithelial
+            if initial_type == CellType.CORNIFIED_SQUAMOUS and 200.0 <= area <= 3000.0 and nuclear_ratio >= 0.08:
+                return CellType.NUCLEATED_EPITHELIAL, 0.85
+
+            # Guardrail: Huge cells cannot be single leukocytes
+            if initial_type == CellType.LEUKOCYTE and area >= 800.0:
+                if nuclear_ratio < 0.06:
+                    return CellType.CORNIFIED_SQUAMOUS, 0.85
+                return CellType.NUCLEATED_EPITHELIAL, 0.80
+
+            # Guardrail: Large anucleate sheets cannot be nucleated epithelial
+            if initial_type == CellType.NUCLEATED_EPITHELIAL and area >= 1800.0 and nuclear_ratio < 0.04:
+                return CellType.CORNIFIED_SQUAMOUS, 0.88
+
+            return initial_type, profile.confidence
+
+        # 2. Pure morphometry decision rules
+        # Leukocyte: Small round/dense cells
+        if area <= 450.0 and circularity >= 0.45 and aspect_ratio <= 2.2:
+            nuclear_evidence = nuclear_ratio >= 0.18 or profile.mean_intensity <= 130.0
+            if nuclear_evidence:
+                confidence = 0.72 + 0.18 * circularity
+                return CellType.LEUKOCYTE, min(confidence, 0.98)
+
+        # Cornified Squamous: Large, flat, anucleate sheets
+        if area >= 1000.0:
+            anucleate = nuclear_ratio < 0.08
+            irregular = circularity < 0.70 or aspect_ratio > 1.40
+            if anucleate or irregular or area >= 2500.0:
+                confidence = 0.70 + min(area / 10000.0, 0.15) + (0.08 if anucleate else 0.0)
                 return CellType.CORNIFIED_SQUAMOUS, min(confidence, 0.98)
 
-        # Intermediate round/oval cells with an appreciable dark nuclear region
-        # are nucleated epithelial cells.
-        if 250.0 <= area <= 3500.0:
-            nuclear_evidence = nuclear_ratio >= 0.07 or intensity_cv >= 0.16
-            if nuclear_evidence and circularity >= 0.30 and aspect_ratio <= 3.0:
-                confidence = 0.62 + min(nuclear_ratio, 0.35) * 0.55 + 0.10 * circularity
+        # Nucleated Epithelial: Intermediate cells with nucleus
+        if 200.0 <= area <= 3500.0:
+            nuclear_evidence = nuclear_ratio >= 0.06 or intensity_cv >= 0.15
+            if nuclear_evidence and circularity >= 0.25 and aspect_ratio <= 3.2:
+                confidence = 0.65 + min(nuclear_ratio, 0.35) * 0.50 + 0.10 * circularity
                 return CellType.NUCLEATED_EPITHELIAL, min(confidence, 0.95)
 
-        if area >= 1200.0:
-            return CellType.CORNIFIED_SQUAMOUS, 0.58
-        if area <= 500.0 and circularity >= 0.42:
-            return CellType.LEUKOCYTE, 0.56
-        if aspect_ratio <= 3.0 and circularity >= 0.25:
-            return CellType.NUCLEATED_EPITHELIAL, 0.54
+        if area >= 800.0 and nuclear_ratio < 0.06:
+            return CellType.CORNIFIED_SQUAMOUS, 0.60
+        if area <= 400.0 and circularity >= 0.40:
+            return CellType.LEUKOCYTE, 0.58
+        if aspect_ratio <= 3.0 and circularity >= 0.20:
+            return CellType.NUCLEATED_EPITHELIAL, 0.55
         return CellType.DEBRIS, 0.65
-
     def classify(
         self,
         profiles: list[CellProfile],

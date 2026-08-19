@@ -363,6 +363,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "opencv-python" },
     { name = "pillow" },
     { name = "pyside6" },
     { name = "scikit-image" },
@@ -386,6 +387,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.8.0" },
     { name = "numpy", specifier = ">=1.26.0" },
+    { name = "opencv-python", specifier = ">=4.8.0" },
     { name = "pillow", specifier = ">=10.2.0" },
     { name = "pyside6", specifier = ">=6.6.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },

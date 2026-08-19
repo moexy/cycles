@@ -124,16 +124,27 @@ def test_cell_classifier_types_profiles_and_aggregates_metrics() -> None:
 
 def test_cell_classifier_preserves_confident_yolo_typing() -> None:
     profile = _profile(
+        area=2000,
+        circularity=0.55,
+        aspect_ratio=1.4,
+        mean=160,
+        predicted_type=CellType.CORNIFIED_SQUAMOUS,
+        confidence=0.95,
+    )
+    cell_type, confidence = CellClassifier().classify_cell(profile, 0.0)
+    assert cell_type is CellType.CORNIFIED_SQUAMOUS and confidence == pytest.approx(0.95)
+
+    # Guardrail: Small dense objects predicted as Cornified by YOLO are corrected to Leukocyte
+    dense_profile = _profile(
         area=100,
         circularity=0.9,
         aspect_ratio=1.0,
         mean=80,
         predicted_type=CellType.CORNIFIED_SQUAMOUS,
-        confidence=0.95,
+        confidence=0.85,
     )
-    cell_type, confidence = CellClassifier().classify_cell(profile, 0.9)
-    assert cell_type is CellType.CORNIFIED_SQUAMOUS and confidence == pytest.approx(0.95)
-
+    guardrail_type, _ = CellClassifier().classify_cell(dense_profile, 0.9)
+    assert guardrail_type is CellType.LEUKOCYTE
 
 @pytest.mark.parametrize(
     ("metrics", "expected"),
