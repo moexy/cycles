@@ -289,6 +289,33 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
     print(f"Wrote benchmark report to {args.output}")
     return 0
 
+def _cmd_train(args: argparse.Namespace) -> int:
+    from cycles.core.models import get_device
+    from cycles.stages.cnn import CNNTrainerService, CNNTrainingConfig
+
+    device = get_device(args.device if args.device != "auto" else None)
+    config = CNNTrainingConfig(
+        architecture=args.architecture,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.lr,
+        freeze_backbone=not args.no_freeze,
+        output_path=args.output,
+    )
+    trainer = CNNTrainerService(device=device)
+    result = trainer.train(
+        train_dir=args.train_dir,
+        val_dir=args.val_dir,
+        config=config,
+        progress_callback=lambda m: print(
+            f"Epoch {m.epoch}/{config.epochs}: Train Loss={m.train_loss:.4f} (Acc={m.train_accuracy*100:.1f}%), "
+            f"Val Loss={m.val_loss:.4f} (Acc={m.val_accuracy*100:.1f}%) [LR={m.learning_rate:.6f}]"
+        ),
+    )
+    print(f"Training complete! Best checkpoint saved to {result.checkpoint_path} (Val Acc={result.best_val_accuracy*100:.1f}%)")
+    return 0
+
+
 
 def _cmd_gui(args: argparse.Namespace) -> int:
     from cycles.gui.app import main as gui_main
@@ -338,6 +365,18 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--plot-dir", type=Path)
     evaluate.add_argument("--models", default="cnn,cell-centric,mil")
     evaluate.set_defaults(func=_cmd_evaluate)
+
+    train = subparsers.add_parser("train", help="Fine-tune ResNet-50 CNN on stage folders")
+    train.add_argument("--train-dir", type=_existing_directory, required=True)
+    train.add_argument("--val-dir", type=_existing_directory, required=True)
+    train.add_argument("--output", type=Path, default=Path("runs/resnet50_finetuned.pt"))
+    train.add_argument("--epochs", type=int, default=25)
+    train.add_argument("--batch-size", type=int, default=16)
+    train.add_argument("--lr", type=float, default=1e-4)
+    train.add_argument("--architecture", default="resnet50")
+    train.add_argument("--no-freeze", action="store_true", help="Train all layers instead of freezing backbone")
+    train.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
+    train.set_defaults(func=_cmd_train)
 
     gui = subparsers.add_parser("gui", help="Launch the PySide6 desktop application")
     gui.add_argument("--checkpoint", type=Path)

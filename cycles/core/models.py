@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pickle
 import warnings
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -49,9 +49,10 @@ def _build_with_weights(
 
 
 def _build_resnet50(num_classes: int, pretrained: bool) -> nn.Module:
+    weights = models.ResNet50_Weights.IMAGENET1K_V2 if hasattr(models.ResNet50_Weights, "IMAGENET1K_V2") else models.ResNet50_Weights.DEFAULT
     model = _build_with_weights(
         models.resnet50,
-        models.ResNet50_Weights.DEFAULT,
+        weights,
         pretrained,
     )
     if not hasattr(model, "fc") or not isinstance(model.fc, nn.Linear):
@@ -189,32 +190,32 @@ def _normalize_architecture(architecture: str) -> str:
     return normalized
 
 
+def freeze_layers(
+    model: nn.Module,
+    trainable_prefixes: Sequence[str] = ("layer4", "fc", "classifier"),
+) -> None:
+    """Freeze all model parameters except those starting with trainable_prefixes."""
+    for name, param in model.named_parameters():
+        param.requires_grad = any(name.startswith(prefix) for prefix in trainable_prefixes)
+
+
 def build_model(
     architecture: str = "resnet50",
     num_classes: int = 4,
     pretrained: bool = True,
+    freeze_backbone: bool = False,
+    trainable_prefixes: Sequence[str] = ("layer4", "fc", "classifier"),
 ) -> nn.Module:
-    """Build a torchvision classifier with a task-specific output head.
-
-    Args:
-        architecture: Backbone name from :data:`BACKBONE_REGISTRY`.
-        num_classes: Number of output classes.
-        pretrained: Initialize the backbone with its default ImageNet weights.
-
-    Raises:
-        ValueError: If the architecture or class count is invalid.
-        RuntimeError: If torchvision exposes an unexpected classification head.
-    """
+    """Build a torchvision classifier with a task-specific output head."""
     if isinstance(num_classes, bool) or not isinstance(num_classes, int) or num_classes <= 0:
         raise ValueError(f"num_classes must be a positive integer, got {num_classes!r}")
     normalized = _normalize_architecture(architecture)
     model = BACKBONE_REGISTRY[normalized](num_classes, pretrained)
-    # These attributes make interactive inspection useful without changing the
-    # serialized state_dict format.
+    if freeze_backbone:
+        freeze_layers(model, trainable_prefixes)
     model.architecture = normalized  # type: ignore[attr-defined]
     model.num_classes = num_classes  # type: ignore[attr-defined]
     return model
-
 
 def _load_payload(path: Path, map_location: torch.device | str) -> object:
     try:

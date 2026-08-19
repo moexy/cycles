@@ -18,7 +18,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
 from cycles.core.cycle import compute_confidence_index
-from cycles.core.models import build_model, load_checkpoint, save_checkpoint
+from cycles.core.models import build_model, freeze_layers, load_checkpoint, save_checkpoint
 from cycles.core.preprocessing import (
     discover_images,
     get_inference_transforms,
@@ -61,6 +61,9 @@ class CNNTrainingConfig:
     min_delta: float = 0.0
     num_workers: int = 0
     pretrained: bool = True
+    freeze_backbone: bool = True
+    trainable_layers: tuple[str, ...] = ("layer4", "fc", "classifier")
+    aggressive_stain_augmentation: bool = True
     output_path: Path | str = Path("runs/cnn_best.pt")
 
     def __post_init__(self) -> None:
@@ -428,7 +431,11 @@ class CNNTrainerService:
         cfg = config or CNNTrainingConfig()
         train_dataset = _StageFolderDataset(
             train_dir,
-            transform=get_train_transforms(img_size=cfg.img_size, augment=True),
+            transform=get_train_transforms(
+                img_size=cfg.img_size,
+                augment=True,
+                aggressive_stain=cfg.aggressive_stain_augmentation,
+            ),
         )
         val_dataset = _StageFolderDataset(
             val_dir,
@@ -453,6 +460,8 @@ class CNNTrainerService:
             architecture=cfg.architecture,
             num_classes=len(EstrousStage.canonical_stages()),
             pretrained=cfg.pretrained,
+            freeze_backbone=cfg.freeze_backbone,
+            trainable_prefixes=cfg.trainable_layers,
         ).to(self.device)
         optimizer = self._build_optimizer(model, cfg)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -552,24 +561,25 @@ class CNNTrainerService:
             cancelled=cancelled,
         )
 
-    def _build_optimizer(
-        self,
-        model: nn.Module,
-        config: CNNTrainingConfig,
-    ) -> torch.optim.Optimizer:
-        if config.optimizer is OptimizerName.RMSPROP:
-            return torch.optim.RMSprop(
-                model.parameters(),
+    @staticmethod
+    def _build_optimizer(model: nn.Module, config: CNNTrainingConfig) -> torch.optim.Optimizer:
+        if config.freeze_backbone:
+            freeze_layers(model, config.trainable_layers)
+        trainable = [param for param in model.parameters() if param.requires_grad]
+        if not trainable:
+            raise ValueError("No trainable parameters found in model")
+        if config.optimizer == OptimizerName.ADAMW:
+            return torch.optim.AdamW(
+                trainable,
                 lr=config.learning_rate,
-                alpha=config.rmsprop_alpha,
                 weight_decay=config.weight_decay,
             )
-        return torch.optim.AdamW(
-            model.parameters(),
+        return torch.optim.RMSprop(
+            trainable,
             lr=config.learning_rate,
+            alpha=config.rmsprop_alpha,
             weight_decay=config.weight_decay,
         )
-
     def _train_epoch(
         self,
         model: nn.Module,

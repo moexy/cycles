@@ -226,25 +226,42 @@ def get_inference_transforms(
 def get_train_transforms(
     img_size: int = 224,
     augment: bool = True,
+    *,
+    aggressive_stain: bool = True,
 ) -> transforms.Compose:
     """Build a training transform pipeline for orientation-free cytology images."""
     _validate_img_size(img_size)
     operations: list[object] = [transforms.Lambda(_to_rgb_pil)]
     if augment:
-        operations.extend(
-            [
-                transforms.RandomResizedCrop(
-                    (img_size, img_size),
-                    scale=(0.8, 1.0),
-                    ratio=(0.9, 1.1),
-                    antialias=True,
-                ),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomVerticalFlip(),
-                transforms.RandomRotation(20),
-                transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.1),
-            ]
-        )
+        if aggressive_stain:
+            operations.extend(
+                [
+                    transforms.RandomResizedCrop(
+                        (img_size, img_size),
+                        scale=(0.7, 1.0),
+                        antialias=True,
+                    ),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.RandomRotation(90),
+                    transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.15),
+                ]
+            )
+        else:
+            operations.extend(
+                [
+                    transforms.RandomResizedCrop(
+                        (img_size, img_size),
+                        scale=(0.8, 1.0),
+                        ratio=(0.9, 1.1),
+                        antialias=True,
+                    ),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.RandomRotation(20),
+                    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.1),
+                ]
+            )
     else:
         operations.append(transforms.Resize((img_size, img_size), antialias=True))
     operations.extend(

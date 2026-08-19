@@ -165,3 +165,17 @@ def test_save_checkpoint_rejects_class_count_mismatch(tmp_path: Path) -> None:
     metadata.classes = ["only-one"]
     with pytest.raises(ValueError, match="class count"):
         model_utils.save_checkpoint(tmp_path / "bad.pt", TinyResNet(), metadata)
+
+def test_freeze_layers_freezes_backbone_and_keeps_trainable_heads() -> None:
+    model = TinyResNet(num_classes=4)
+    model.layer1 = nn.Linear(3, 3)
+    model_utils.freeze_layers(model, trainable_prefixes=("layer4", "fc"))
+
+    assert not model.layer1.weight.requires_grad
+    assert model.layer4[0].weight.requires_grad
+    assert model.fc.weight.requires_grad
+
+    built = model_utils.build_model("resnet50", num_classes=4, pretrained=False, freeze_backbone=True)
+    assert not built.conv1.weight.requires_grad
+    assert built.layer4[0].conv1.weight.requires_grad
+    assert built.fc.weight.requires_grad
