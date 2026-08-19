@@ -221,28 +221,52 @@ class CellDetector:
                 initial_type = CellType.DEBRIS
 
             max_contrast = float(crop_contrast.max()) if crop_contrast.size else 0.0
-
-            # Cytomorphological verification on YOLO candidate
-            if initial_type == CellType.CORNIFIED_SQUAMOUS and area <= 450.0:
-                if nc_ratio >= 0.20 or max_contrast >= 22.0:
-                    final_type = CellType.LEUKOCYTE
-                else:
-                    final_type = CellType.DEBRIS
-            elif initial_type == CellType.CORNIFIED_SQUAMOUS and 200.0 <= area <= 3000.0 and nc_ratio >= 0.08:
-                final_type = CellType.NUCLEATED_EPITHELIAL
-            elif initial_type == CellType.NUCLEATED_EPITHELIAL and area <= 300.0 and nc_ratio >= 0.40:
-                final_type = CellType.LEUKOCYTE
-            elif initial_type == CellType.NUCLEATED_EPITHELIAL and area >= 1500.0 and nc_ratio < 0.04:
-                final_type = CellType.CORNIFIED_SQUAMOUS
-            elif initial_type == CellType.LEUKOCYTE and area >= 800.0:
-                final_type = CellType.CORNIFIED_SQUAMOUS if nc_ratio < 0.06 else CellType.NUCLEATED_EPITHELIAL
-            else:
-                final_type = initial_type
-
             perimeter = float(2 * (box_w + box_h))
             circularity = float(np.clip(4.0 * np.pi * area / max(perimeter**2, 1.0), 0.0, 1.0))
             aspect_ratio = float(max(box_w, box_h) / max(min(box_w, box_h), 1))
 
+            # Cytomorphological verification on YOLO candidate
+            dark_nuc_pixels = int(np.count_nonzero(crop_contrast >= 20))
+            nuc_density = dark_nuc_pixels / max(area, 1.0)
+            min_val = float(crop.min()) if crop.size else 255.0
+            mean_val = float(crop.mean()) if crop.size else 255.0
+            has_cytoplasm_ring = (min_val <= 110.0) and (mean_val >= 135.0) and (mean_val - min_val >= 25.0)
+
+            if initial_type == CellType.CORNIFIED_SQUAMOUS:
+                # Small candidate is a leukocyte
+                if area <= 450.0:
+                    final_type = CellType.LEUKOCYTE if (nc_ratio >= 0.15 or max_contrast >= 20.0) else CellType.DEBRIS
+                # Single central nucleus surrounded by visible cytoplasm is nucleated epithelial
+                elif 300.0 <= area <= 2500.0 and has_cytoplasm_ring and aspect_ratio <= 1.8 and circularity >= 0.40:
+                    final_type = CellType.NUCLEATED_EPITHELIAL
+                # Dense cluster of dark leukocyte nuclei is a leukocyte cluster
+                elif nuc_density >= 0.12 or dark_nuc_pixels >= 40:
+                    final_type = CellType.LEUKOCYTE
+                # True large anucleated sheets
+                elif area >= 1200.0 and nc_ratio < 0.05 and not has_cytoplasm_ring:
+                    final_type = CellType.CORNIFIED_SQUAMOUS
+                elif dark_nuc_pixels >= 15:
+                    final_type = CellType.LEUKOCYTE
+                else:
+                    final_type = CellType.DEBRIS
+            elif initial_type == CellType.NUCLEATED_EPITHELIAL:
+                if 300.0 <= area <= 2500.0 and has_cytoplasm_ring and aspect_ratio <= 1.8:
+                    final_type = CellType.NUCLEATED_EPITHELIAL
+                elif area <= 450.0 or nuc_density >= 0.20:
+                    final_type = CellType.LEUKOCYTE
+                elif area >= 1800.0 and nc_ratio < 0.04:
+                    final_type = CellType.CORNIFIED_SQUAMOUS
+                else:
+                    final_type = CellType.LEUKOCYTE if dark_nuc_pixels >= 20 else CellType.DEBRIS
+            elif initial_type == CellType.LEUKOCYTE:
+                if area >= 1200.0 and nc_ratio < 0.05:
+                    final_type = CellType.CORNIFIED_SQUAMOUS
+                elif 350.0 <= area <= 2500.0 and has_cytoplasm_ring and aspect_ratio <= 1.8:
+                    final_type = CellType.NUCLEATED_EPITHELIAL
+                else:
+                    final_type = CellType.LEUKOCYTE
+            else:
+                final_type = initial_type
             profiles.append(
                 CellProfile(
                     bbox=(y1, x1, y2, x2),
@@ -411,14 +435,14 @@ class CellDetector:
 
         for i in range(1, num_blobs):
             area = float(blob_stats[i, cv2.CC_STAT_AREA])
-            if area < self.min_area or area > 3500.0:
+            if area < self.min_area or area > 4000.0:
                 continue
             x = int(blob_stats[i, cv2.CC_STAT_LEFT])
             y = int(blob_stats[i, cv2.CC_STAT_TOP])
             w = int(blob_stats[i, cv2.CC_STAT_WIDTH])
             h = int(blob_stats[i, cv2.CC_STAT_HEIGHT])
             aspect_ratio = float(max(w, h) / max(min(w, h), 1))
-            if aspect_ratio > 3.2:
+            if aspect_ratio > 3.0:
                 continue
             solidity = area / max(w * h, 1)
             if solidity < 0.35:
@@ -426,39 +450,84 @@ class CellDetector:
 
             cx, cy = blob_centroids[i]
             crop = gray[y:y + h, x:x + w]
+            crop_cont = contrast[y:y + h, x:x + w]
             nc_ratio = _nuclear_ratio(crop)
             perimeter = float(2 * (w + h))
             circularity = float(np.clip(4.0 * np.pi * area / max(perimeter**2, 1.0), 0.0, 1.0))
 
-            if area <= 350.0 and (solidity >= 0.40 or circularity >= 0.35):
+            # Distinct single nucleus pixels
+            nuc_pixels = int(np.count_nonzero(crop_cont >= max(26, int(crop_cont.max() * 0.70))))
+
+            # True single Nucleated Epithelial Cell:
+            if (
+                300.0 <= area <= 2500.0
+                and circularity >= 0.40
+                and aspect_ratio <= 2.0
+                and nuc_pixels >= 60
+                and 0.10 <= nc_ratio <= 0.50
+            ):
+                cell_type = CellType.NUCLEATED_EPITHELIAL
+                conf = 0.85
+                nuc_coords.append((cy, cx))
+                profiles.append(
+                    CellProfile(
+                        bbox=(y, x, y + h, x + w),
+                        centroid=(float(cy), float(cx)),
+                        area=area,
+                        perimeter=perimeter,
+                        circularity=circularity,
+                        aspect_ratio=aspect_ratio,
+                        mean_intensity=float(crop.mean()) if crop.size else 0.0,
+                        std_intensity=float(crop.std()) if crop.size else 0.0,
+                        predicted_type=cell_type,
+                        confidence=conf,
+                    )
+                )
+                self.last_nuclear_ratios.append(nc_ratio)
+                labels[y:y + h, x:x + w] = curr_label
+                curr_label += 1
+            elif area <= 450.0:
                 cell_type = CellType.LEUKOCYTE
                 conf = 0.88
                 leuko_coords.append((cy, cx))
-            elif area >= 150.0 and nc_ratio >= 0.06:
-                cell_type = CellType.NUCLEATED_EPITHELIAL
-                conf = 0.82
-                nuc_coords.append((cy, cx))
-            else:
-                cell_type = CellType.DEBRIS
-                conf = 0.50
-
-            profiles.append(
-                CellProfile(
-                    bbox=(y, x, y + h, x + w),
-                    centroid=(float(cy), float(cx)),
-                    area=area,
-                    perimeter=perimeter,
-                    circularity=circularity,
-                    aspect_ratio=aspect_ratio,
-                    mean_intensity=float(crop.mean()) if crop.size else 0.0,
-                    std_intensity=float(crop.std()) if crop.size else 0.0,
-                    predicted_type=cell_type,
-                    confidence=conf,
+                profiles.append(
+                    CellProfile(
+                        bbox=(y, x, y + h, x + w),
+                        centroid=(float(cy), float(cx)),
+                        area=area,
+                        perimeter=perimeter,
+                        circularity=circularity,
+                        aspect_ratio=aspect_ratio,
+                        mean_intensity=float(crop.mean()) if crop.size else 0.0,
+                        std_intensity=float(crop.std()) if crop.size else 0.0,
+                        predicted_type=cell_type,
+                        confidence=conf,
+                    )
                 )
-            )
-            self.last_nuclear_ratios.append(nc_ratio)
-            labels[y:y + h, x:x + w] = curr_label
-            curr_label += 1
+                self.last_nuclear_ratios.append(nc_ratio)
+                labels[y:y + h, x:x + w] = curr_label
+                curr_label += 1
+            else:
+                # Multi-leukocyte cluster: decompose into individual constituent leukocytes
+                eff_cells = max(1, int(np.round(area / 180.0)))
+                for _ in range(eff_cells):
+                    profiles.append(
+                        CellProfile(
+                            bbox=(y, x, y + h, x + w),
+                            centroid=(float(cy), float(cx)),
+                            area=area / eff_cells,
+                            perimeter=perimeter / eff_cells,
+                            circularity=circularity,
+                            aspect_ratio=aspect_ratio,
+                            mean_intensity=float(crop.mean()) if crop.size else 0.0,
+                            std_intensity=float(crop.std()) if crop.size else 0.0,
+                            predicted_type=CellType.LEUKOCYTE,
+                            confidence=0.80,
+                        )
+                    )
+                    self.last_nuclear_ratios.append(0.45)
+                labels[y:y + h, x:x + w] = curr_label
+                curr_label += 1
 
         # 3. Cornified Squamous Sheets & Anucleated Cell Bodies
         edges = cv2.Canny(gray, 30, 80)
@@ -474,7 +543,8 @@ class CellDetector:
                 int_leuko = sum(1 for ny, nx in leuko_coords if y <= ny < y + h and x <= nx < x + w)
                 nuclear_density = (int_nuc + int_leuko) / (area / 1000.0)
 
-                if nuclear_density < 0.20:
+                # Truly anucleated sheets (< 0.10 nuclei/leukocytes per 1000 px)
+                if nuclear_density < 0.10:
                     eff_cells = max(1, int(np.round(area / 2000.0)))
                     for _ in range(eff_cells):
                         profiles.append(
