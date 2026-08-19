@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QAction, QCloseEvent, QColor
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFrame,
@@ -138,7 +139,19 @@ class MainWindow(QMainWindow):
         )
         self.export_action.triggered.connect(self.export_results)
         toolbar.addAction(self.export_action)
+        toolbar.addSeparator()
 
+        self.toggle_labels_action = QAction(
+            style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView),
+            "Hide Labels",
+            self,
+        )
+        self.toggle_labels_action.setCheckable(True)
+        self.toggle_labels_action.setChecked(True)
+        self.toggle_labels_action.setShortcut("L")
+        self.toggle_labels_action.setToolTip("Toggle Cell Labels & Overlays Visibility (L)")
+        self.toggle_labels_action.triggered.connect(self._on_toggle_labels)
+        toolbar.addAction(self.toggle_labels_action)
     def _build_workspace(self) -> None:
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         splitter.setChildrenCollapsible(False)
@@ -182,12 +195,18 @@ class MainWindow(QMainWindow):
         self.stage_banner = QLabel("No stage prediction")
         self.stage_banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.stage_banner.setObjectName("stageBanner")
-        self.image_canvas = ImageOverlayCanvas(frame)
+        header_row = QHBoxLayout()
         self.image_caption = QLabel("Image and explainability overlay")
-        self.image_caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.labels_checkbox = QCheckBox("Show Overlay Labels (L)")
+        self.labels_checkbox.setChecked(True)
+        self.labels_checkbox.toggled.connect(self._on_toggle_labels)
+        header_row.addWidget(self.image_caption, 1)
+        header_row.addWidget(self.labels_checkbox)
+
+        self.image_canvas = ImageOverlayCanvas(frame)
         layout.addWidget(self.stage_banner)
+        layout.addLayout(header_row)
         layout.addWidget(self.image_canvas, 1)
-        layout.addWidget(self.image_caption)
         return frame
 
     def _build_details_sidebar(self) -> QWidget:
@@ -617,6 +636,14 @@ class MainWindow(QMainWindow):
             return
         self.status_label.setText(f"Exported results to {output}")
         QMessageBox.information(self, "Export Complete", f"Results written to:\n{output}")
+
+    def _on_toggle_labels(self, checked: bool) -> None:
+        """Toggle explainability bounding boxes and text badges on canvas."""
+        self.image_canvas.set_show_labels(checked)
+        self.toggle_labels_action.setChecked(checked)
+        self.toggle_labels_action.setText("Hide Labels" if checked else "Show Labels")
+        if hasattr(self, "labels_checkbox") and self.labels_checkbox.isChecked() != checked:
+            self.labels_checkbox.setChecked(checked)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if self._worker is not None and self._worker.isRunning():

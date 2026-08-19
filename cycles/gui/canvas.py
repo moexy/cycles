@@ -53,6 +53,11 @@ class ImageOverlayCanvas(FigureCanvasQTAgg):
         self.setParent(parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._image_shape: tuple[int, int] | None = None
+        self.show_labels: bool = True
+        self._last_image: Any | None = None
+        self._last_bounding_boxes: Any | None = None
+        self._last_attention_heatmap: Any | None = None
+        self._last_title: str | None = None
         self.mpl_connect("scroll_event", self._on_scroll)
         self.clear()
 
@@ -72,6 +77,10 @@ class ImageOverlayCanvas(FigureCanvasQTAgg):
         )
         self.axes.set_axis_off()
         self._image_shape = None
+        self._last_image = None
+        self._last_bounding_boxes = None
+        self._last_attention_heatmap = None
+        self._last_title = None
         self.draw_idle()
 
     def show_image(
@@ -82,12 +91,12 @@ class ImageOverlayCanvas(FigureCanvasQTAgg):
         attention_heatmap: np.ndarray | None = None,
         title: str | None = None,
     ) -> None:
-        """Render an RGB/grayscale image and optional explainability overlays.
+        """Render an RGB/grayscale image and optional explainability overlays."""
+        self._last_image = image
+        self._last_bounding_boxes = bounding_boxes
+        self._last_attention_heatmap = attention_heatmap
+        self._last_title = title
 
-        Boxes may be mappings or objects with ``bbox`` and optional ``label`` /
-        ``cell_type`` / ``confidence`` attributes. Coordinates are interpreted as
-        ``(y1, x1, y2, x2)``, matching the cell-centric pipeline.
-        """
         pixels = self._load_pixels(image)
         self.axes.clear()
         self.axes.set_facecolor("#111827")
@@ -106,35 +115,57 @@ class ImageOverlayCanvas(FigureCanvasQTAgg):
                 extent=(0, pixels.shape[1], pixels.shape[0], 0),
             )
 
-        for box in bounding_boxes or ():
-            parsed = self._parse_box(box)
-            if parsed is None:
-                continue
-            y1, x1, y2, x2, label, color = parsed
-            self.axes.add_patch(
-                Rectangle(
-                    (x1, y1),
-                    max(0.0, x2 - x1),
-                    max(0.0, y2 - y1),
-                    fill=False,
-                    edgecolor=color,
-                    linewidth=1.8,
+        if self.show_labels:
+            for box in bounding_boxes or ():
+                parsed = self._parse_box(box)
+                if parsed is None:
+                    continue
+                y1, x1, y2, x2, label, color = parsed
+                self.axes.add_patch(
+                    Rectangle(
+                        (x1, y1),
+                        max(0.0, x2 - x1),
+                        max(0.0, y2 - y1),
+                        fill=False,
+                        edgecolor=color,
+                        linewidth=1.8,
+                    )
                 )
-            )
-            if label:
-                self.axes.text(
-                    x1,
-                    max(0.0, y1 - 3),
-                    label,
-                    color="white",
-                    fontsize=8,
-                    bbox={"facecolor": color, "alpha": 0.8, "edgecolor": "none", "pad": 1.5},
-                )
+                if label:
+                    self.axes.text(
+                        x1,
+                        max(0.0, y1 - 3),
+                        label,
+                        color="white",
+                        fontsize=8,
+                        bbox={"facecolor": color, "alpha": 0.8, "edgecolor": "none", "pad": 1.5},
+                    )
 
         if title:
             self.axes.set_title(title, color="#f8fafc", fontsize=11, pad=8)
         self.axes.set_axis_off()
         self.draw_idle()
+
+    def toggle_labels(self) -> bool:
+        """Toggle visibility of bounding boxes and text labels, redrawing instantly."""
+        self.show_labels = not self.show_labels
+        self._redraw_current()
+        return self.show_labels
+
+    def set_show_labels(self, show: bool) -> None:
+        """Set label visibility explicitly."""
+        if self.show_labels != show:
+            self.show_labels = bool(show)
+            self._redraw_current()
+
+    def _redraw_current(self) -> None:
+        if self._last_image is not None:
+            self.show_image(
+                self._last_image,
+                bounding_boxes=self._last_bounding_boxes,
+                attention_heatmap=self._last_attention_heatmap,
+                title=self._last_title,
+            )
 
     @staticmethod
     def _load_pixels(image: Path | str | Image.Image | np.ndarray) -> np.ndarray:

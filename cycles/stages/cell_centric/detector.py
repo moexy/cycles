@@ -260,25 +260,29 @@ class CellDetector:
             self.last_nuclear_ratios.append(nc_ratio)
             labels[y1:y2, x1:x2] = idx
 
-        # Always merge high-contrast morphological leukocytes that YOLO missed
-        morph_profiles = self._detect_morphometry(rgb)
-        morph_leukos = [p for p in morph_profiles if p.predicted_type == CellType.LEUKOCYTE]
-        if morph_leukos:
-            # Exclude morphological leukocytes that heavily overlap with existing leukocyte detections
-            existing_leuko_boxes = [p.bbox for p in profiles if p.predicted_type == CellType.LEUKOCYTE]
-            for ml in morph_leukos:
-                my1, mx1, my2, mx2 = ml.bbox
-                overlap = False
-                for ey1, ex1, ey2, ex2 in existing_leuko_boxes:
-                    inter_h = max(0, min(my2, ey2) - max(my1, ey1))
-                    inter_w = max(0, min(mx2, ex2) - max(mx1, ex1))
-                    if inter_h * inter_w > 0:
-                        overlap = True
-                        break
-                if not overlap:
-                    profiles.append(ml)
-                    self.last_nuclear_ratios.append(0.50)
+        # Complement YOLO with high-contrast morphological leukocytes if YOLO missed them
+        corn_count = sum(1 for p in profiles if p.predicted_type == CellType.CORNIFIED_SQUAMOUS)
+        total_valid = sum(1 for p in profiles if p.predicted_type != CellType.DEBRIS)
 
+        # Only merge morphological leukocytes if YOLO did not already detect pure cornified sheets
+        is_pure_estrus = (total_valid >= 150) and (corn_count / max(total_valid, 1) >= 0.85)
+        if not is_pure_estrus:
+            morph_profiles = self._detect_morphometry(rgb)
+            morph_leukos = [p for p in morph_profiles if p.predicted_type == CellType.LEUKOCYTE]
+            if morph_leukos:
+                existing_leuko_boxes = [p.bbox for p in profiles if p.predicted_type == CellType.LEUKOCYTE]
+                for ml in morph_leukos:
+                    my1, mx1, my2, mx2 = ml.bbox
+                    overlap = False
+                    for ey1, ex1, ey2, ex2 in existing_leuko_boxes:
+                        inter_h = max(0, min(my2, ey2) - max(my1, ey1))
+                        inter_w = max(0, min(mx2, ex2) - max(mx1, ex1))
+                        if inter_h * inter_w > 0:
+                            overlap = True
+                            break
+                    if not overlap:
+                        profiles.append(ml)
+                        self.last_nuclear_ratios.append(0.50)
         self.last_labels = labels
         return profiles
 
@@ -288,13 +292,12 @@ class CellDetector:
         tile_size: int = 640,
         overlap: int = 128,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Run sliding-window tiled YOLO inference with coordinate mapping and NMS."""
+        """Run sliding-window tiled YOLO inference with batched prediction and NMS."""
         assert self._yolo_model is not None
         height, width = rgb.shape[:2]
         stride = tile_size - overlap
-        all_boxes: list[np.ndarray] = []
-        all_classes: list[int] = []
-        all_scores: list[float] = []
+        crops: list[np.ndarray] = []
+        offsets: list[tuple[int, int]] = []
 
         for y in range(0, height, stride):
             for x in range(0, width, stride):
@@ -302,27 +305,40 @@ class CellDetector:
                 y_end = min(y + tile_size, height)
                 x_start = max(0, x_end - tile_size)
                 y_start = max(0, y_end - tile_size)
+                crops.append(rgb[y_start:y_end, x_start:x_end])
+                offsets.append((x_start, y_start))
 
-                crop = rgb[y_start:y_end, x_start:x_end]
-                results = self._yolo_model.predict(
-                    source=crop,
-                    conf=self.confidence_threshold,
-                    imgsz=tile_size,
-                    device=self.device,
-                    verbose=False,
-                )
-                if not results or results[0].boxes is None or len(results[0].boxes) == 0:
-                    continue
-                b = results[0].boxes.xyxy.detach().cpu().numpy()
-                c = results[0].boxes.cls.detach().cpu().numpy().astype(int)
-                s = results[0].boxes.conf.detach().cpu().numpy()
+        if not crops:
+            return np.empty((0, 4)), np.empty((0,), dtype=int), np.empty((0,))
 
-                b[:, [0, 2]] += x_start
-                b[:, [1, 3]] += y_start
+        # Single batched forward pass on GPU/MPS
+        batch_size = min(16, len(crops))
+        results = self._yolo_model.predict(
+            source=crops,
+            conf=self.confidence_threshold,
+            imgsz=tile_size,
+            batch=batch_size,
+            device=self.device,
+            verbose=False,
+        )
 
-                all_boxes.extend(b)
-                all_classes.extend(c)
-                all_scores.extend(s)
+        all_boxes: list[np.ndarray] = []
+        all_classes: list[int] = []
+        all_scores: list[float] = []
+
+        for res, (x_start, y_start) in zip(results, offsets, strict=False):
+            if not res or res.boxes is None or len(res.boxes) == 0:
+                continue
+            b = res.boxes.xyxy.detach().cpu().numpy()
+            c = res.boxes.cls.detach().cpu().numpy().astype(int)
+            s = res.boxes.conf.detach().cpu().numpy()
+
+            b[:, [0, 2]] += x_start
+            b[:, [1, 3]] += y_start
+
+            all_boxes.extend(b)
+            all_classes.extend(c)
+            all_scores.extend(s)
 
         if not all_boxes:
             return np.empty((0, 4)), np.empty((0,), dtype=int), np.empty((0,))
@@ -371,60 +387,27 @@ class CellDetector:
             self.last_labels = np.zeros_like(gray, dtype=np.int32)
             return []
 
-        # 1. Fast Background Estimation & Contrast
+        # 1. Fast Background Estimation & Contrast (OpenCV SIMD)
         bg_ksize = min(51, min(height, width) // 4 * 2 + 1)
         bg = cv2.medianBlur(gray, bg_ksize)
         contrast = cv2.subtract(bg, gray)
 
-        # 2. Cornified Squamous Sheets & Large Cell Bodies via Edge Closing
-        edges = cv2.Canny(gray, 18, 55)
-        kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-        closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel_close)
-        contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        cornified_mask = np.zeros((height, width), dtype=np.uint8)
-        total_cornified_area = 0.0
-
-        profiles: list[CellProfile] = []
-        self.last_nuclear_ratios = []
-        labels = np.zeros((height, width), dtype=np.int32)
-        curr_label = 1
-
-        # Extract Cornified Sheets
-        for cnt in contours:
-            area = float(cv2.contourArea(cnt))
-            if area >= 800.0:
-                total_cornified_area += area
-                cv2.drawContours(cornified_mask, [cnt], -1, 255, -1)
-                eff_cells = max(1, int(np.round(area / 1500.0)))
-                x, y, w, h = cv2.boundingRect(cnt)
-                for _ in range(eff_cells):
-                    profiles.append(
-                        CellProfile(
-                            bbox=(int(y), int(x), int(y + h), int(x + w)),
-                            centroid=(float(y + h / 2.0), float(x + w / 2.0)),
-                            area=area / eff_cells,
-                            perimeter=float(cv2.arcLength(cnt, True)) / eff_cells,
-                            circularity=0.35,
-                            aspect_ratio=float(max(w, h) / max(min(w, h), 1)),
-                            mean_intensity=float(gray[y:y + h, x:x + w].mean()),
-                            std_intensity=float(gray[y:y + h, x:x + w].std()),
-                            predicted_type=CellType.CORNIFIED_SQUAMOUS,
-                            confidence=0.92,
-                        )
-                    )
-                    self.last_nuclear_ratios.append(0.0)
-
-        sheet_cov_pct = total_cornified_area / (height * width) * 100.0
-
-        # 3. Solid Dense Nuclear / Leukocyte Detection
-        _, dark_blobs = cv2.threshold(contrast, 24, 255, cv2.THRESH_BINARY)
+        # 2. Extract Solid Dark Nuclei and Leukocytes
+        _, dark_blobs = cv2.threshold(contrast, 18, 255, cv2.THRESH_BINARY)
         kernel3 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         dark_blobs = cv2.morphologyEx(dark_blobs, cv2.MORPH_OPEN, kernel3)
 
         num_blobs, blob_labels, blob_stats, blob_centroids = cv2.connectedComponentsWithStats(
             dark_blobs, connectivity=8
         )
+
+        profiles: list[CellProfile] = []
+        self.last_nuclear_ratios = []
+        labels = np.zeros((height, width), dtype=np.int32)
+        curr_label = 1
+
+        leuko_coords: list[tuple[float, float]] = []
+        nuc_coords: list[tuple[float, float]] = []
 
         for i in range(1, num_blobs):
             area = float(blob_stats[i, cv2.CC_STAT_AREA])
@@ -435,30 +418,26 @@ class CellDetector:
             w = int(blob_stats[i, cv2.CC_STAT_WIDTH])
             h = int(blob_stats[i, cv2.CC_STAT_HEIGHT])
             aspect_ratio = float(max(w, h) / max(min(w, h), 1))
-            if aspect_ratio > 3.0:
+            if aspect_ratio > 3.2:
                 continue
             solidity = area / max(w * h, 1)
             if solidity < 0.35:
                 continue
 
             cx, cy = blob_centroids[i]
-            is_inside_sheet = cornified_mask[int(cy), int(cx)] > 0
-
-            # If inside massive cornified sheet on high-coverage Estrus slides, ignore intracellular speckles
-            if is_inside_sheet and sheet_cov_pct >= 60.0:
-                continue
-
             crop = gray[y:y + h, x:x + w]
             nc_ratio = _nuclear_ratio(crop)
             perimeter = float(2 * (w + h))
             circularity = float(np.clip(4.0 * np.pi * area / max(perimeter**2, 1.0), 0.0, 1.0))
 
-            if area <= 300.0 and (solidity >= 0.40 or circularity >= 0.35):
+            if area <= 350.0 and (solidity >= 0.40 or circularity >= 0.35):
                 cell_type = CellType.LEUKOCYTE
                 conf = 0.88
+                leuko_coords.append((cy, cx))
             elif area >= 150.0 and nc_ratio >= 0.06:
                 cell_type = CellType.NUCLEATED_EPITHELIAL
                 conf = 0.82
+                nuc_coords.append((cy, cx))
             else:
                 cell_type = CellType.DEBRIS
                 conf = 0.50
@@ -481,5 +460,37 @@ class CellDetector:
             labels[y:y + h, x:x + w] = curr_label
             curr_label += 1
 
+        # 3. Cornified Squamous Sheets & Anucleated Cell Bodies
+        edges = cv2.Canny(gray, 30, 80)
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel_close)
+        contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for cnt in contours:
+            area = float(cv2.contourArea(cnt))
+            if area >= 1500.0:
+                x, y, w, h = cv2.boundingRect(cnt)
+                int_nuc = sum(1 for ny, nx in nuc_coords if y <= ny < y + h and x <= nx < x + w)
+                int_leuko = sum(1 for ny, nx in leuko_coords if y <= ny < y + h and x <= nx < x + w)
+                nuclear_density = (int_nuc + int_leuko) / (area / 1000.0)
+
+                if nuclear_density < 0.20:
+                    eff_cells = max(1, int(np.round(area / 2000.0)))
+                    for _ in range(eff_cells):
+                        profiles.append(
+                            CellProfile(
+                                bbox=(int(y), int(x), int(y + h), int(x + w)),
+                                centroid=(float(y + h / 2.0), float(x + w / 2.0)),
+                                area=area / eff_cells,
+                                perimeter=float(cv2.arcLength(cnt, True)) / eff_cells,
+                                circularity=0.35,
+                                aspect_ratio=float(max(w, h) / max(min(w, h), 1)),
+                                mean_intensity=float(gray[y:y + h, x:x + w].mean()),
+                                std_intensity=float(gray[y:y + h, x:x + w].std()),
+                                predicted_type=CellType.CORNIFIED_SQUAMOUS,
+                                confidence=0.90,
+                            )
+                        )
+                        self.last_nuclear_ratios.append(0.0)
         self.last_labels = labels
         return profiles
