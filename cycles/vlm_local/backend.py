@@ -30,12 +30,13 @@ class MLXVLMBackend:
         max_tokens: int = 1024,
     ) -> None:
         try:
-            from mlx_vlm import generate, load
+            from mlx_vlm import apply_chat_template, generate, load
         except ImportError as exc:
             raise RuntimeError(
                 "Local VLM inference requires the optional 'mlx' dependencies on Apple Silicon"
             ) from exc
         self._generate = generate
+        self._apply_chat_template = apply_chat_template
         self._model_id = model_id
         self._model_revision = model_revision
         self._adapter_path = Path(adapter_path).expanduser() if adapter_path else None
@@ -65,10 +66,19 @@ class MLXVLMBackend:
                 path = Path(temporary) / f"view-{index}.png"
                 image.save(path, format="PNG")
                 paths.append(str(path))
+            # generate() does not apply the chat template; without it the prompt
+            # carries no image placeholder tokens and the vision embedding has
+            # nowhere to scatter, so the model raises a broadcast error.
+            formatted = self._apply_chat_template(
+                self._processor,
+                self._model.config,
+                prompt,
+                num_images=len(paths),
+            )
             result = self._generate(
                 self._model,
                 self._processor,
-                prompt,
+                formatted,
                 image=paths,
                 max_tokens=self._max_tokens,
                 verbose=False,

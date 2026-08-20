@@ -7,9 +7,10 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from cycles.core.types import EstrousStage
 from cycles.vlm_local.calibration import TemperatureCalibrator
 from cycles.vlm_local.pipeline import LocalVLMPipeline
-from cycles.vlm_local.schema import QCStatus
+from cycles.vlm_local.schema import ImagePrediction, QCStatus
 from cycles.vlm_local.views import build_view_pack
 
 
@@ -178,3 +179,53 @@ def test_pipeline_applies_validation_calibrator_to_raw_scores(tmp_path: Path) ->
     assert record.image_prediction.primary_stage is not None
     assert record.image_prediction.primary_stage.value == "estrus"
     assert record.provenance["calibrator_hash"] == calibrator.sha256
+
+
+def test_image_prediction_accepts_confident_one_hot_distribution() -> None:
+    """A one-hot distribution ties three stages at zero.
+
+    Which tied stage lands in a given sorted slot is arbitrary, so the secondary
+    stage is validated against the second-largest probability *value*. Requiring
+    identity with a particular tied key would reject every confident prediction.
+    """
+    payload = {
+        "raw_scores": {"diestrus": 0.0, "proestrus": 0.0, "estrus": 0.0, "metestrus": 1.0},
+        "probabilities": {"diestrus": 0.0, "proestrus": 0.0, "estrus": 0.0, "metestrus": 1.0},
+        "primary_stage": "metestrus",
+        "secondary_stage": "estrus",
+        "confidence_tier": "high",
+        "rationale": "Ghost nuclei with leukocyte infiltration.",
+    }
+
+    prediction = ImagePrediction.from_dict(payload)
+
+    assert prediction.primary_stage is EstrousStage.METESTRUS
+    assert prediction.secondary_stage is EstrousStage.ESTRUS
+
+
+def test_image_prediction_still_rejects_primary_below_the_mode() -> None:
+    payload = {
+        "raw_scores": {"diestrus": 0.1, "proestrus": 0.1, "estrus": 0.1, "metestrus": 0.7},
+        "probabilities": {"diestrus": 0.1, "proestrus": 0.1, "estrus": 0.1, "metestrus": 0.7},
+        "primary_stage": "diestrus",
+        "secondary_stage": "metestrus",
+        "confidence_tier": "high",
+        "rationale": "Inconsistent with the reported distribution.",
+    }
+
+    with pytest.raises(ValueError, match="largest probability"):
+        ImagePrediction.from_dict(payload)
+
+
+def test_image_prediction_rejects_secondary_that_is_not_runner_up() -> None:
+    payload = {
+        "raw_scores": {"diestrus": 0.05, "proestrus": 0.15, "estrus": 0.1, "metestrus": 0.7},
+        "probabilities": {"diestrus": 0.05, "proestrus": 0.15, "estrus": 0.1, "metestrus": 0.7},
+        "primary_stage": "metestrus",
+        "secondary_stage": "diestrus",
+        "confidence_tier": "medium",
+        "rationale": "Diestrus is the weakest stage, not the runner-up.",
+    }
+
+    with pytest.raises(ValueError, match="second-largest probability"):
+        ImagePrediction.from_dict(payload)

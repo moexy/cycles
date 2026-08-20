@@ -109,10 +109,16 @@ class ImagePrediction:
             raise ValueError("secondary_stage must differ from primary_stage")
         raw_scores = _stage_map(payload["raw_scores"], normalise=False)
         probabilities = _stage_map(payload["probabilities"], normalise=True)
-        ranked = sorted(probabilities, key=probabilities.__getitem__, reverse=True)
-        if primary != ranked[0]:
+        # Compare probability values rather than sorted-key identity. A confident
+        # model emits ties (one-hot leaves three stages at 0.0) and which tied key
+        # sorts into a given slot is arbitrary, so demanding identity would reject
+        # correct output that no model could be asked to guess.
+        ordered = sorted(probabilities.values(), reverse=True)
+        if not math.isclose(probabilities[primary], ordered[0], rel_tol=1e-9, abs_tol=1e-9):
             raise ValueError("primary_stage must match the largest probability")
-        if secondary is not None and secondary != ranked[1]:
+        if secondary is not None and not math.isclose(
+            probabilities[secondary], ordered[1], rel_tol=1e-9, abs_tol=1e-9
+        ):
             raise ValueError("secondary_stage must match the second-largest probability")
         rationale = payload.get("rationale")
         if not isinstance(rationale, str) or not rationale.strip():
