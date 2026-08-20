@@ -1,0 +1,106 @@
+{
+  "measurement_status": "observed_single_run_not_extrapolated",
+  "model": {
+    "adapter_hash": "none",
+    "model_id": "mlx-community/Qwen3-VL-4B-Instruct-8bit",
+    "model_revision": "0943db6e15185b86be368d3cf0704aec740b142b",
+    "prompt_prefix_reuse": "on"
+  },
+  "record": {
+    "day": null,
+    "image_path": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+    "image_prediction": {
+      "confidence_tier": "medium",
+      "primary_stage": "metestrus",
+      "probabilities": {
+        "diestrus": 0.22451523569930606,
+        "estrus": 0.08259453944353537,
+        "metestrus": 0.6102956854136232,
+        "proestrus": 0.08259453944353537
+      },
+      "rationale": "The presence of abundant leukocytes and nucleated epithelial cells, alongside the absence of cornified squames, aligns with diestrus criteria, but the mixed nuclear state and scattered arrangement of cells, combined with the presence of debris and mucus, strongly suggest a transitional metestrus stage where multiple cell types coexist.",
+      "raw_scores": {
+        "diestrus": 1.0,
+        "estrus": 0.0,
+        "metestrus": 2.0,
+        "proestrus": 0.0
+      },
+      "secondary_stage": "diestrus"
+    },
+    "image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271",
+    "morphology": {
+      "arrangement": "mixed",
+      "artifacts": [
+        "mucus",
+        "debris"
+      ],
+      "cornified_squames": "absent",
+      "evidence": [
+        "Cells with prominent purple-stained nuclei and cytoplasmic boundaries visible across all images.",
+        "Clusters of cells with varying nuclear sizes and shapes, some appearing rounded and others irregular.",
+        "Presence of small, darkly stained cellular fragments and amorphous material in the background.",
+        "Some cells show clear nuclei, while others appear as ghost nuclei or have indistinct nuclear outlines.",
+        "Cells are distributed in scattered, clustered, and sheet-like arrangements, with no consistent pattern."
+      ],
+      "leukocytes": "present",
+      "nuclear_state": "mixed",
+      "nucleated_epithelial": "present",
+      "qc_reasons": [],
+      "qc_status": "usable"
+    },
+    "provenance": {
+      "adapter_hash": "none",
+      "calibrator_hash": "97175498a239771909b7e83bad41d8aa1e395a29ef2232b71576ba3bb73dcf3c",
+      "model_id": "mlx-community/Qwen3-VL-4B-Instruct-8bit",
+      "model_revision": "0943db6e15185b86be368d3cf0704aec740b142b",
+      "prompt_prefix_reuse": "on",
+      "prompt_version": "morphology-first-v3",
+      "schema_version": "3.0",
+      "software_lock_hash": "08f98edb9b3403181893dc043a53e6f81cc79feb47f49df330e26ee56f7f6563",
+      "view_pack_version": "overview-quadrants-v1"
+    },
+    "sample_id": "mouse3D1",
+    "schema_version": "3.0",
+    "sequence_prediction": {
+      "adjusted": false,
+      "final_stage": "metestrus",
+      "reason": "image_only"
+    },
+    "subject_id": null
+  },
+  "resource_usage": {
+    "generation_call_count": 2,
+    "generation_calls": [
+      {
+        "generation_tokens": 195,
+        "generation_tokens_per_second": 55.844011,
+        "prompt_tokens": 8843,
+        "prompt_tokens_per_second": 400.369163,
+        "wall_seconds": 26.711833
+      },
+      {
+        "generation_tokens": 118,
+        "generation_tokens_per_second": 57.836933,
+        "prompt_tokens": 9061,
+        "prompt_tokens_per_second": 12760.924141,
+        "wall_seconds": 3.080874
+      }
+    ],
+    "inference_seconds": 30.750347,
+    "model_load_seconds": 4.299476,
+    "peak_after_load_bytes": 5106544648,
+    "peak_after_load_gib": 4.75584,
+    "peak_overall_bytes": 7414174515,
+    "peak_overall_gib": 6.904988
+  },
+  "schema_version": "1.0",
+  "software": {
+    "mlx": "0.32.1",
+    "mlx_vlm": "0.6.15",
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.14"
+  },
+  "source_image": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+  "source_image_role": "non-held-out training image",
+  "source_image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271"
+}

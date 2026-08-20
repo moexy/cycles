@@ -1,0 +1,104 @@
+{
+  "measurement_status": "observed_single_run_not_extrapolated",
+  "model": {
+    "adapter_hash": "none",
+    "model_id": "mlx-community/gemma-3-12b-it-4bit",
+    "model_revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558",
+    "prompt_prefix_reuse": "on"
+  },
+  "record": {
+    "day": null,
+    "image_path": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+    "image_prediction": {
+      "confidence_tier": "high",
+      "primary_stage": "proestrus",
+      "probabilities": {
+        "diestrus": 0.00010867536902661761,
+        "estrus": 0.00010867536902661761,
+        "metestrus": 0.11917701317903795,
+        "proestrus": 0.8806056360829088
+      },
+      "rationale": "The morphology report indicates that nucleated epithelial cells are dominant, with ghost nuclei present, and cornified squames are scattered throughout the field. This aligns most closely with the proestrus stage, where nucleated epithelial cells dominate and cornification is low, while leukocytes are rare.",
+      "raw_scores": {
+        "diestrus": 1.0,
+        "estrus": 1.0,
+        "metestrus": 8.0,
+        "proestrus": 10.0
+      },
+      "secondary_stage": "metestrus"
+    },
+    "image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271",
+    "morphology": {
+      "arrangement": "clusters",
+      "artifacts": [
+        "debris"
+      ],
+      "cornified_squames": "present",
+      "evidence": [
+        "Numerous epithelial cells with ghost nuclei are present.",
+        "Cornified squames are scattered throughout the field.",
+        "A few leukocytes are observed.",
+        "Epithelial cells are primarily in small clusters."
+      ],
+      "leukocytes": "rare",
+      "nuclear_state": "ghost_nuclei",
+      "nucleated_epithelial": "dominant",
+      "qc_reasons": [],
+      "qc_status": "usable"
+    },
+    "provenance": {
+      "adapter_hash": "none",
+      "calibrator_hash": "97175498a239771909b7e83bad41d8aa1e395a29ef2232b71576ba3bb73dcf3c",
+      "model_id": "mlx-community/gemma-3-12b-it-4bit",
+      "model_revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558",
+      "prompt_prefix_reuse": "on",
+      "prompt_version": "morphology-first-v3",
+      "schema_version": "3.0",
+      "software_lock_hash": "08f98edb9b3403181893dc043a53e6f81cc79feb47f49df330e26ee56f7f6563",
+      "view_pack_version": "overview-quadrants-v1"
+    },
+    "sample_id": "mouse3D1",
+    "schema_version": "3.0",
+    "sequence_prediction": {
+      "adjusted": false,
+      "final_stage": "proestrus",
+      "reason": "image_only"
+    },
+    "subject_id": null
+  },
+  "resource_usage": {
+    "generation_call_count": 2,
+    "generation_calls": [
+      {
+        "generation_tokens": 153,
+        "generation_tokens_per_second": 47.467506,
+        "prompt_tokens": 1505,
+        "prompt_tokens_per_second": 170.908768,
+        "wall_seconds": 12.741797
+      },
+      {
+        "generation_tokens": 122,
+        "generation_tokens_per_second": 40.814667,
+        "prompt_tokens": 1653,
+        "prompt_tokens_per_second": 175.057599,
+        "wall_seconds": 12.675383
+      }
+    ],
+    "inference_seconds": 26.505384,
+    "model_load_seconds": 5.7489,
+    "peak_after_load_bytes": 7528078568,
+    "peak_after_load_gib": 7.01107,
+    "peak_overall_bytes": 10257298536,
+    "peak_overall_gib": 9.552854
+  },
+  "schema_version": "1.0",
+  "software": {
+    "mlx": "0.32.1",
+    "mlx_vlm": "0.6.15",
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.14"
+  },
+  "source_image": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+  "source_image_role": "non-held-out training image",
+  "source_image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271"
+}

@@ -4,15 +4,24 @@
 
 - [ ] Start a fresh restricted annotation session with access only to
   `/Volumes/SSD/Imaging/Cycles/dataset_split/train`; deny access to all legacy stage metadata.
-- [ ] Create and freeze a SHA-256 inventory of all 343 teacher images.
+- [ ] Add and verify a blinded image-only mode before that session. Static audit shows the current
+  review queue and image heading display `record.sample_id`, and the queue also displays `record.day`.
+  A fresh context alone does not prevent subject/day leakage through the UI.
+- [x] Create and freeze a path-blind content inventory of all 343 teacher images. Artifact:
+  `docs/inventories/vlm-teacher-train-content-inventory-2026-08-20.json`; aggregate SHA-256
+  `6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f`; 168,804,058 bytes and no
+  duplicate-content groups. A fresh restricted context must recompute and match it before annotation.
 - [ ] Complete the image-only morphology/stage/uncertainty pass and hash the annotation log.
 - [ ] Expose subject/day ordering only after that freeze and complete the second sequence pass for
   the 141 longitudinal images.
 - [x] Run one native-Metal, non-held-out inference smoke test and verify the installed MLX-VLM API,
   JSON repair path, memory accounting, and provenance. Done 2026-08-20 for Qwen3-VL 4B 8-bit; it
   found three real defects, fixed in `e7e6521`. Peak 6.95 GiB, 59 s/image.
-- [ ] Repeat the smoke test for the two remaining candidates (Qwen3-VL 8B 4-bit, Gemma 3 12B 4-bit)
-  before the bakeoff, confirming peak allocation stays under 36 GiB at the larger sizes.
+- [x] Repeat full two-pass prompt-v3 resource smokes for all candidates on the same non-held-out
+  image, with immutable revisions and per-generation telemetry saved under `docs/probes/`. Observed
+  peak overall: Qwen3-VL 4B 8-bit 6.90 GiB, Qwen3-VL 8B 4-bit 7.68 GiB, Gemma 3 12B 4-bit 9.55 GiB.
+  All are below 36 GiB. Single-run inference times were 30.75 s, 31.77 s, and 26.51 s respectively;
+  do not treat these as a stable latency ranking.
 - [x] Diagnose the 59 s/image latency. The model was never the bottleneck (decode 58-74 tok/s). Three
   causes fixed in `471b536`: a repair round-trip on every confident image, no prefix reuse between
   the two passes, and an underspecified stage prompt. Now 21 s/image, ~2 h for the 343 teacher

@@ -107,6 +107,20 @@ peak overall      6.949 GiB        budget 36 GiB — comfortable
 inference        ~21 s / image
 ```
 
+That table is the historical v2 optimization run. Direct prompt-v3 resource smokes were later run
+for all candidates on the same non-held-out training image, with full telemetry in `docs/probes/`:
+
+| model | immutable revision | load | two-pass inference | calls | peak overall |
+|---|---|---:|---:|---:|---:|
+| Qwen3-VL 4B 8-bit | `0943db6e…` | 4.30 s | 30.75 s | 2 | 6.90 GiB |
+| Qwen3-VL 8B 4-bit | `defcdea7…` | 4.17 s | 31.77 s | 2 | 7.68 GiB |
+| Gemma 3 12B 4-bit | `86cc6a8d…` | 5.75 s | 26.51 s | 2 | 9.55 GiB |
+
+All observed peaks are below the 36 GiB gate. These are single runs, not throughput estimates or a
+latency ranking. A preceding uninstrumented 4B run took 54.9 s; whether that difference was runtime
+variance or an extra repair call is unknown, so it must not be silently averaged away. The final
+telemetry runs each used exactly two generation calls.
+
 ---
 
 ## 4. Controlled staging probe: the blocker was the contract, not model size
@@ -257,12 +271,17 @@ with no metadata or held-out access, as the plan already requires.
 See [`TODO_MLX_V3.md`](TODO_MLX_V3.md) for the full list. Ordered by what blocks what:
 
 1. **Fresh, stage-blind teacher annotation** in a restricted context with access only to
-   `/Volumes/SSD/Imaging/Cycles/dataset_split/train`. Freeze a SHA-256 inventory of the 343 images,
-   complete the image-only pass, hash the log, and only then expose subject/day ordering for the 141
-   longitudinal images. Nothing downstream is valid without this.
+   `/Volumes/SSD/Imaging/Cycles/dataset_split/train`. Before displaying an image, recompute the
+   path-blind 343-image inventory and match aggregate SHA-256
+   `6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f`. Then complete the image-only
+   pass, hash the log, and only then expose subject/day ordering for the 141 longitudinal images.
+   **Do not use the current review UI unchanged:** static audit shows its queue displays
+   `record.sample_id` and `record.day`, and its image heading displays `record.sample_id`. Implement
+   and verify a blinded display mode first. Nothing downstream is valid without this.
 2. **Rerun a small labeled, non-held-out real-image comparison under prompt v3** before a full
    bakeoff. The controlled probe proves contract compliance only.
-3. **Measure peak allocation** for the 8B and 12B candidates and confirm it stays under 36 GiB.
+3. **Freeze the prefill mode and measurement protocol** before any scored multi-model run; the
+   resource smokes establish feasibility but not comparative throughput.
 4. Then: bakeoff -> decide whether SFT is warranted -> replay-ratio domain adaptation if warranted -> freeze -> single held-out
    open, with all gates from the plan.
 
@@ -288,6 +307,16 @@ Single-image inference (non-held-out only):
   --model-revision 0943db6e15185b86be368d3cf0704aec740b142b \
   --output /tmp/cycles-mlx-smoke.jsonl
 # add --no-prompt-prefix-reuse to force cold prefill
+```
+
+Verify the frozen, path-blind teacher corpus before a fresh annotation pass:
+
+```bash
+.venv/bin/python scripts/freeze_vlm_inventory.py \
+  --input /Volumes/SSD/Imaging/Cycles/dataset_split/train \
+  --output /tmp/vlm-teacher-inventory-check.json
+cmp /tmp/vlm-teacher-inventory-check.json \
+  docs/inventories/vlm-teacher-train-content-inventory-2026-08-20.json
 ```
 
 Model weights are already in `~/.cache/huggingface/hub`; no re-download needed for the 4B candidate.

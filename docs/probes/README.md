@@ -21,3 +21,19 @@ for counterfactual morphology. The probe tests prompt/schema sensitivity while c
 Prompt v3 adds the missing stage criteria and removes redundant model-authored probability, rank,
 and confidence fields. The code derives those fields from the returned evidence scores. Those scores
 are not internal logits, so probability calibration remains an empirical validation task.
+
+## Full-pipeline resource smokes
+
+Each `resource-smoke` artifact is one observed, non-held-out, two-pass prompt-v3 run with the same
+training image. It stores the complete model record plus per-generation token counts/rates. These are
+single-run measurements, not throughput estimates.
+
+| model | load | two-pass inference | calls | peak after load | peak overall |
+|---|---:|---:|---:|---:|---:|
+| Qwen3-VL 4B 8-bit | 4.30 s | 30.75 s | 2 | 4.76 GiB | 6.90 GiB |
+| Qwen3-VL 8B 4-bit | 4.17 s | 31.77 s | 2 | 5.37 GiB | 7.68 GiB |
+| Gemma 3 12B 4-bit | 5.75 s | 26.51 s | 2 | 7.01 GiB | 9.55 GiB |
+
+All are below the 36 GiB gate in these runs. Latency is not a model ranking: it varies with view
+tokenization and prefill behavior, and a prior 4B run on the same image took 54.9 seconds before the
+telemetry rerun. The JSON artifacts, rather than this rounded table, are authoritative.

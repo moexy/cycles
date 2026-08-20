@@ -1,0 +1,109 @@
+{
+  "measurement_status": "observed_single_run_not_extrapolated",
+  "model": {
+    "adapter_hash": "none",
+    "model_id": "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+    "model_revision": "defcdea7cc7a4b0858fea563cbbce171d328e457",
+    "prompt_prefix_reuse": "on"
+  },
+  "record": {
+    "day": null,
+    "image_path": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+    "image_prediction": {
+      "confidence_tier": "medium",
+      "primary_stage": "proestrus",
+      "probabilities": {
+        "diestrus": 0.17970181623671497,
+        "estrus": 0.17970181623671497,
+        "metestrus": 0.19860122123019158,
+        "proestrus": 0.4419951462963786
+      },
+      "rationale": "The slide shows nucleated epithelial cells as the dominant cell type, with visible nuclei and a mixed arrangement, while cornified squames are absent and leukocytes are absent, which aligns with proestrus morphology.",
+      "raw_scores": {
+        "diestrus": 0.0,
+        "estrus": 0.0,
+        "metestrus": 0.1,
+        "proestrus": 0.9
+      },
+      "secondary_stage": "metestrus"
+    },
+    "image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271",
+    "morphology": {
+      "arrangement": "mixed",
+      "artifacts": [
+        "mucus",
+        "debris"
+      ],
+      "cornified_squames": "absent",
+      "evidence": [
+        "Clusters of purple-stained epithelial cells with visible nuclei",
+        "Some cells show clear nuclear detail, others appear ghost-like",
+        "Background contains pale yellow mucus and cellular debris",
+        "Cells are not uniformly arranged, showing mixed distribution"
+      ],
+      "leukocytes": "absent",
+      "nuclear_state": "mixed",
+      "nucleated_epithelial": "dominant",
+      "qc_reasons": [
+        "cells well stained",
+        "clear cellular detail",
+        "no major artifacts obscuring diagnosis"
+      ],
+      "qc_status": "usable"
+    },
+    "provenance": {
+      "adapter_hash": "none",
+      "calibrator_hash": "97175498a239771909b7e83bad41d8aa1e395a29ef2232b71576ba3bb73dcf3c",
+      "model_id": "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+      "model_revision": "defcdea7cc7a4b0858fea563cbbce171d328e457",
+      "prompt_prefix_reuse": "on",
+      "prompt_version": "morphology-first-v3",
+      "schema_version": "3.0",
+      "software_lock_hash": "08f98edb9b3403181893dc043a53e6f81cc79feb47f49df330e26ee56f7f6563",
+      "view_pack_version": "overview-quadrants-v1"
+    },
+    "sample_id": "mouse3D1",
+    "schema_version": "3.0",
+    "sequence_prediction": {
+      "adjusted": false,
+      "final_stage": "proestrus",
+      "reason": "image_only"
+    },
+    "subject_id": null
+  },
+  "resource_usage": {
+    "generation_call_count": 2,
+    "generation_calls": [
+      {
+        "generation_tokens": 171,
+        "generation_tokens_per_second": 58.457526,
+        "prompt_tokens": 8843,
+        "prompt_tokens_per_second": 373.725491,
+        "wall_seconds": 27.565157
+      },
+      {
+        "generation_tokens": 104,
+        "generation_tokens_per_second": 57.359655,
+        "prompt_tokens": 9031,
+        "prompt_tokens_per_second": 8329.508571,
+        "wall_seconds": 3.223971
+      }
+    ],
+    "inference_seconds": 31.769161,
+    "model_load_seconds": 4.170811,
+    "peak_after_load_bytes": 5761191400,
+    "peak_after_load_gib": 5.365528,
+    "peak_overall_bytes": 8248398465,
+    "peak_overall_gib": 7.68192
+  },
+  "schema_version": "1.0",
+  "software": {
+    "mlx": "0.32.1",
+    "mlx_vlm": "0.6.15",
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.14"
+  },
+  "source_image": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+  "source_image_role": "non-held-out training image",
+  "source_image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271"
+}
