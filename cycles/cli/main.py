@@ -469,9 +469,9 @@ def _read_vlm_sequence_manifest(path: Path) -> dict[Path, dict[str, Any]]:
 
 DEFAULT_VLM_MODEL = "mlx-community/Qwen3-VL-8B-Instruct-4bit"
 PINNED_MODEL_REVISIONS: dict[str, str] = {
-    "mlx-community/Qwen3-VL-8B-Instruct-4bit": "9ba067a99fba636e053cbdb2ebaf2a417c8cfeb2",
+    "mlx-community/Qwen3-VL-8B-Instruct-4bit": "defcdea7cc7a4b0858fea563cbbce171d328e457",
     "mlx-community/Qwen3-VL-4B-Instruct-8bit": "0943db6e15185b86be368d3cf0704aec740b142b",
-    "mlx-community/gemma-3-12b-it-4bit": "86cc6a8d799fa7e366052dc5e33bf7dc974e4776",
+    "mlx-community/gemma-3-12b-it-4bit": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558",
 }
 
 

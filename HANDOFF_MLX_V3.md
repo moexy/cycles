@@ -388,7 +388,7 @@ Single-image or folder inference (non-held-out only, with resume support):
 uv run python -m cycles.cli.main vlm-local \
   --input /Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp \
   --model mlx-community/Qwen3-VL-8B-Instruct-4bit \
-  --model-revision 9ba067a99fba636e053cbdb2ebaf2a417c8cfeb2 \
+  --model-revision defcdea7cc7a4b0858fea563cbbce171d328e457 \
   --output runs/inference.jsonl \
   --resume
 ```
