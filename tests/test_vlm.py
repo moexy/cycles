@@ -26,13 +26,10 @@ def test_vlm_encode_image(sample_image: Path) -> None:
     assert len(encoded) > 0
 
 
-def test_vlm_fallback_interpretation(sample_image: Path) -> None:
-    service = VLMInterpretationService(VLMConfig(endpoint_url="http://invalid.local/v1"))
-    result = service.interpret_image(sample_image)
-    assert isinstance(result, ClassificationResult)
-    assert result.predicted_stage in EstrousStage.canonical_stages()
-    assert 0.0 <= result.confidence <= 1.0
-
+def test_vlm_missing_credentials_raises_informative_error(sample_image: Path) -> None:
+    service = VLMInterpretationService(VLMConfig(api_key=""))
+    with pytest.raises(RuntimeError, match="requires an API key"):
+        service.interpret_image(sample_image)
 
 def test_vlm_mocked_api_response(sample_image: Path) -> None:
     mock_payload = {

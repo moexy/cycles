@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from PIL import Image, ImageOps
 
 from cycles.core.types import BatchClassificationResult, ClassificationResult, EstrousStage
@@ -56,7 +55,7 @@ class VLMConfig:
 
     endpoint_url: str | None = None
     api_key: str | None = None
-    model_name: str = "default"
+    model_name: str = "gpt-4o"
     timeout_seconds: float = 45.0
     max_image_dim: int = 1024
 
@@ -70,14 +69,16 @@ class VLMInterpretationService:
             "VLM_ENDPOINT_URL",
             os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/completions"),
         )
-        self.api_key = self.config.api_key or os.environ.get("OPENAI_API_KEY", "")
+        self.api_key = self.config.api_key or os.environ.get(
+            "OPENAI_API_KEY",
+            os.environ.get("VLM_API_KEY", ""),
+        )
 
     def _encode_image(self, image_path: Path | str) -> str:
         """Load and resize image to JPEG base64 string for efficient VLM payload transfer."""
         path = Path(image_path).expanduser()
         with Image.open(path) as raw_img:
             img = ImageOps.exif_transpose(raw_img).convert("RGB")
-            # Downscale large WSI images to reasonable dimension for VLM while preserving cellular details
             w, h = img.size
             max_dim = self.config.max_image_dim
             if max(w, h) > max_dim:
@@ -92,6 +93,15 @@ class VLMInterpretationService:
         path = Path(image_path).expanduser()
         if not path.is_file():
             raise FileNotFoundError(f"Cytology image not found: {path}")
+
+        # If endpoint requires auth and no key is provided, fail with a helpful descriptive error
+        is_local = "localhost" in self.endpoint_url or "127.0.0.1" in self.endpoint_url
+        if not self.api_key and not is_local:
+            raise RuntimeError(
+                f"VLM vision interpretation requires an API key or local endpoint. "
+                f"Please set OPENAI_API_KEY, VLM_API_KEY, or configure a local endpoint "
+                f"(VLM_ENDPOINT_URL=http://localhost:11434/v1/chat/completions)."
+            )
 
         base64_img = self._encode_image(path)
         payload = {
@@ -121,7 +131,6 @@ class VLMInterpretationService:
             "Authorization": f"Bearer {self.api_key}" if self.api_key else "",
         }
 
-        # Attempt VLM remote call
         try:
             req = urllib.request.Request(
                 self.endpoint_url,
@@ -134,9 +143,11 @@ class VLMInterpretationService:
                 content = body["choices"][0]["message"]["content"]
                 parsed = json.loads(content)
                 return self._build_result_from_parsed(path, parsed)
+        except urllib.error.HTTPError as exc:
+            err_body = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
+            raise RuntimeError(f"VLM API HTTP {exc.code} error from {self.endpoint_url}: {err_body}") from exc
         except Exception as exc:
-            LOGGER.info("VLM API call unavailable or failed (%s); using rule-grounded interpretation", exc)
-            return self._fallback_interpretation(path, exc)
+            raise RuntimeError(f"VLM API request failed on {self.endpoint_url}: {exc}") from exc
 
     def _build_result_from_parsed(self, path: Path, parsed: dict[str, Any]) -> ClassificationResult:
         stage_str = str(parsed.get("predicted_stage", "diestrus")).strip().lower()
@@ -150,7 +161,6 @@ class VLMInterpretationService:
         probs: dict[EstrousStage, float] = {}
         for s in EstrousStage.canonical_stages():
             probs[s] = float(raw_probs.get(s.value, 0.05))
-        # Normalize
         total_p = sum(probs.values())
         if total_p > 0:
             probs = {k: v / total_p for k, v in probs.items()}
@@ -166,35 +176,6 @@ class VLMInterpretationService:
             confidence_index=conf_idx,
             is_transition=conf_idx < 0.25,
             transition_to=sorted(probs, key=probs.__getitem__, reverse=True)[1] if conf_idx < 0.25 else None,
-        )
-
-    def _fallback_interpretation(self, path: Path, error: Exception) -> ClassificationResult:
-        """Robust fallback using statistical image distribution when remote endpoint is not configured."""
-        with Image.open(path) as raw:
-            arr = np.array(raw.convert("RGB"))
-        gray = arr.mean(axis=2)
-        std_val = float(gray.std())
-        glass = float(np.percentile(gray, 95))
-        tissue_frac = float(np.count_nonzero(gray < glass - 10) / gray.size)
-
-        # Pure Estrus: continuous stained cornified sheets (tissue coverage >= 70% and high texture variance)
-        if tissue_frac >= 0.70 and std_val >= 25.0:
-            stage = EstrousStage.ESTRUS
-            probs = {EstrousStage.ESTRUS: 0.88, EstrousStage.PROESTRUS: 0.05, EstrousStage.METESTRUS: 0.05, EstrousStage.DIESTRUS: 0.02}
-            conf = 0.88
-        else:
-            stage = EstrousStage.DIESTRUS
-            probs = {EstrousStage.DIESTRUS: 0.90, EstrousStage.METESTRUS: 0.05, EstrousStage.PROESTRUS: 0.03, EstrousStage.ESTRUS: 0.02}
-            conf = 0.90
-
-        return ClassificationResult(
-            image_path=path,
-            predicted_stage=stage,
-            confidence=conf,
-            probabilities=probs,
-            confidence_index=0.85,
-            is_transition=False,
-            transition_to=None,
         )
 
     def interpret_folder(

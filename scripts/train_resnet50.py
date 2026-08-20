@@ -57,17 +57,22 @@ def main() -> int:
         freeze_backbone=not args.no_freeze,
         trainable_layers=("layer4", "fc"),
         aggressive_stain_augmentation=True,
-        num_workers=0,  # Safe on macOS
+        num_workers=4,
         output_path=args.output,
     )
 
     trainer = CNNTrainerService(device=device)
     t_start = time.perf_counter()
 
+    def on_batch(batch_idx: int, total_batches: int, running_loss: float, running_acc: float) -> None:
+        if batch_idx % 25 == 0 or batch_idx == total_batches:
+            elapsed = time.perf_counter() - t_start
+            print(f"  [Batch {batch_idx:03d}/{total_batches:03d}] Running Loss: {running_loss:.4f}, Acc: {running_acc*100:5.1f}% ({elapsed:.0f}s)")
+
     def on_epoch(m):
         elapsed = time.perf_counter() - t_start
         print(
-            f"Epoch {m.epoch:02d}/{config.epochs:02d} [{elapsed:4.0f}s]: "
+            f"-> EPOCH {m.epoch:02d}/{config.epochs:02d} [{elapsed:4.0f}s]: "
             f"Train Loss={m.train_loss:.4f} (Acc={m.train_accuracy*100:5.1f}%) | "
             f"Val Loss={m.val_loss:.4f} (Acc={m.val_accuracy*100:5.1f}%) | "
             f"LR={m.learning_rate:.6f}"
@@ -78,8 +83,8 @@ def main() -> int:
         val_dir=args.val_dir,
         config=config,
         progress_callback=on_epoch,
+        batch_callback=on_batch,
     )
-
     print("==================================================")
     print(f"Fine-Tuning Finished in {(time.perf_counter() - t_start):.1f}s!")
     print(f"Best Val Accuracy: {result.best_val_accuracy*100:.1f}% (Epoch {result.best_epoch})")

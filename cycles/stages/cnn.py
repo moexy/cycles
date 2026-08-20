@@ -425,6 +425,7 @@ class CNNTrainerService:
         val_dir: Path | str,
         config: CNNTrainingConfig | None = None,
         progress_callback: Callable[[CNNEpochMetrics], None] | None = None,
+        batch_callback: Callable[[int, int, float, float], None] | None = None,
         cancel_flag: CancelFlag | None = None,
     ) -> CNNTrainingResult:
         """Train, validate, early-stop, and export the best checkpoint."""
@@ -492,6 +493,7 @@ class CNNTrainerService:
                 optimizer,
                 criterion,
                 cancel_flag,
+                batch_callback=batch_callback,
             )
             if cancelled:
                 break
@@ -587,8 +589,13 @@ class CNNTrainerService:
         optimizer: torch.optim.Optimizer,
         criterion: nn.Module,
         cancel_flag: CancelFlag | None,
+        batch_callback: Callable[[int, int, float, float], None] | None = None,
     ) -> tuple[float, float, bool]:
         model.train()
+        loss_sum = 0.0
+        correct = 0
+        sample_count = 0
+        total_batches = len(loader)
         loss_sum = 0.0
         correct = 0
         sample_count = 0
@@ -610,10 +617,16 @@ class CNNTrainerService:
             loss_sum += float(loss.detach().item()) * batch_size
             correct += int((logits.argmax(dim=1) == targets).sum().item())
             sample_count += batch_size
+            if batch_callback is not None:
+                batch_callback(
+                    int(sample_count // batch_size),
+                    total_batches,
+                    loss_sum / sample_count,
+                    correct / sample_count,
+                )
         if sample_count == 0:
             raise ValueError("Training dataset produced no samples")
         return loss_sum / sample_count, correct / sample_count, False
-
     def _validate_epoch(
         self,
         model: nn.Module,
