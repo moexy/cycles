@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict, is_dataclass
@@ -641,6 +642,19 @@ def _export_vlm_records_csv(records: list[Any], output_path: Path) -> None:
             ])
 
 
+def _infer_metadata_from_path(image_path: Path) -> dict[str, Any]:
+    stem = image_path.stem
+    match = re.match(r"^([A-Za-z0-9_-]+?)[-_]?[dD](?:ay)?[-_]?(\d+(?:\.\d+)?)$", stem)
+    if match:
+        subject = match.group(1)
+        try:
+            day = float(match.group(2))
+            return {"sample_id": stem, "subject_id": subject, "day": day}
+        except ValueError:
+            pass
+    return {"sample_id": stem, "subject_id": None, "day": None}
+
+
 def _cmd_vlm_local(args: argparse.Namespace) -> int:
     from cycles.vlm_local.schema import LocalVLMRecord
 
@@ -690,11 +704,7 @@ def _cmd_vlm_local(args: argparse.Namespace) -> int:
             metadata = manifest.get(image_path) if manifest is not None else None
             if manifest is not None and metadata is None:
                 raise ValueError(f"input image is absent from sequence manifest: {image_path}")
-            metadata = metadata or {
-                "sample_id": image_path.stem,
-                "subject_id": None,
-                "day": None,
-            }
+            metadata = metadata or _infer_metadata_from_path(image_path)
             sample_id = metadata["sample_id"]
             existing = existing_by_sample.get(sample_id) or existing_by_path.get(str(image_path))
             if existing is not None:
@@ -714,7 +724,11 @@ def _cmd_vlm_local(args: argparse.Namespace) -> int:
     finally:
         append_stream.close()
 
-    if manifest is not None:
+    has_longitudinal_series = any(
+        getattr(r, "subject_id", None) is not None and getattr(r, "day", None) is not None
+        for r in records
+    )
+    if manifest is not None or has_longitudinal_series:
         records = _build_temporal_reconciler(
             args.margin_threshold,
             args.adjustment_threshold,
