@@ -63,3 +63,31 @@ def test_temperature_calibrator_rejects_non_finite_scores(invalid: float) -> Non
 
     with pytest.raises(ValueError, match="finite"):
         TemperatureCalibrator().transform(scores)
+
+
+def test_fit_and_freeze_calibrator_saves_calibrator_file(tmp_path: Path) -> None:
+    from cycles.vlm_local.calibration import fit_and_freeze_calibrator
+
+    predictions_path = tmp_path / "val_predictions.jsonl"
+    labels_path = tmp_path / "val_labels.csv"
+    output_path = tmp_path / "fitted_calibrator.json"
+
+    rows = [
+        {"sample_id": "s1", "image_prediction": {"raw_scores": {"diestrus": 8.0, "proestrus": 0.0, "estrus": 0.0, "metestrus": 0.0}}},
+        {"sample_id": "s2", "image_prediction": {"raw_scores": {"diestrus": 0.0, "proestrus": 8.0, "estrus": 0.0, "metestrus": 0.0}}},
+        {"sample_id": "s3", "image_prediction": {"raw_scores": {"diestrus": 8.0, "proestrus": 0.0, "estrus": 0.0, "metestrus": 0.0}}},
+    ]
+    predictions_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    labels_path.write_text("sample_id,stage\ns1,diestrus\ns2,proestrus\ns3,proestrus\n", encoding="utf-8")
+
+    result = fit_and_freeze_calibrator(predictions_path, labels_path, output_path)
+
+    assert result["temperature"] > 1.0
+    assert result["post_nll"] < result["pre_nll"]
+    assert result["sample_count"] == 3
+    assert output_path.is_file()
+
+    loaded = TemperatureCalibrator.load(output_path)
+    assert loaded.temperature == pytest.approx(result["temperature"])
+    assert loaded.sha256 == result["calibrator_hash"]
+

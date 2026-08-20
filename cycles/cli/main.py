@@ -419,12 +419,36 @@ def _read_vlm_sequence_manifest(path: Path) -> dict[Path, dict[str, Any]]:
 
 
 def _cmd_vlm_local(args: argparse.Namespace) -> int:
+    from cycles.vlm_local.schema import LocalVLMRecord
+
     images = _vlm_input_images(args.input)
     manifest = (
         _read_vlm_sequence_manifest(args.sequence_manifest)
         if args.sequence_manifest is not None
         else None
     )
+
+    existing_by_sample: dict[str, LocalVLMRecord] = {}
+    existing_by_path: dict[str, LocalVLMRecord] = {}
+    if args.resume and args.output.is_file():
+        with args.output.open(encoding="utf-8") as stream:
+            for _line_number, line in enumerate(stream, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record_dict = json.loads(line)
+                    record = LocalVLMRecord.from_dict(record_dict)
+                    existing_by_sample[record.sample_id] = record
+                    existing_by_path[record.image_path] = record
+                except Exception:
+                    continue
+        if existing_by_sample:
+            print(
+                f"Resuming run from {args.output}: {len(existing_by_sample)} sample(s) already processed.",
+                file=sys.stderr,
+            )
+
     pipeline = _build_local_vlm_pipeline(
         args.model,
         args.adapter,
@@ -432,35 +456,75 @@ def _cmd_vlm_local(args: argparse.Namespace) -> int:
         args.calibrator,
         reuse_prompt_prefix=not args.no_prompt_prefix_reuse,
     )
-    records = []
-    for index, image_path in enumerate(images, start=1):
-        metadata = manifest.get(image_path) if manifest is not None else None
-        if manifest is not None and metadata is None:
-            raise ValueError(f"input image is absent from sequence manifest: {image_path}")
-        metadata = metadata or {
-            "sample_id": image_path.stem,
-            "subject_id": None,
-            "day": None,
-        }
-        records.append(
-            pipeline.classify_image(
-                image_path,
-                sample_id=metadata["sample_id"],
-                subject_id=metadata["subject_id"],
-                day=metadata["day"],
-            )
-        )
-        _progress(index, len(images), f"Classified {image_path.name}")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if not args.resume or not args.output.is_file():
+        args.output.write_text("", encoding="utf-8")
+
+    records: list[LocalVLMRecord] = []
+    append_stream = args.output.open("a", encoding="utf-8")
+    try:
+        for index, image_path in enumerate(images, start=1):
+            metadata = manifest.get(image_path) if manifest is not None else None
+            if manifest is not None and metadata is None:
+                raise ValueError(f"input image is absent from sequence manifest: {image_path}")
+            metadata = metadata or {
+                "sample_id": image_path.stem,
+                "subject_id": None,
+                "day": None,
+            }
+            sample_id = metadata["sample_id"]
+            existing = existing_by_sample.get(sample_id) or existing_by_path.get(str(image_path))
+            if existing is not None:
+                records.append(existing)
+                _progress(index, len(images), f"Skipped (already processed) {image_path.name}")
+            else:
+                record = pipeline.classify_image(
+                    image_path,
+                    sample_id=metadata["sample_id"],
+                    subject_id=metadata["subject_id"],
+                    day=metadata["day"],
+                )
+                records.append(record)
+                append_stream.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
+                append_stream.flush()
+                _progress(index, len(images), f"Classified {image_path.name}")
+    finally:
+        append_stream.close()
+
     if manifest is not None:
         records = _build_temporal_reconciler(
             args.margin_threshold,
             args.adjustment_threshold,
         ).reconcile(records)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("w", encoding="utf-8") as stream:
-        for record in records:
-            stream.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
+        tmp_output = args.output.with_suffix(".tmp")
+        with tmp_output.open("w", encoding="utf-8") as stream:
+            for record in records:
+                stream.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
+        tmp_output.replace(args.output)
+    elif existing_by_sample:
+        tmp_output = args.output.with_suffix(".tmp")
+        with tmp_output.open("w", encoding="utf-8") as stream:
+            for record in records:
+                stream.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
+        tmp_output.replace(args.output)
+
     print(f"Classified {len(records)} image(s); wrote {args.output}")
+    return 0
+
+
+def _cmd_vlm_calibrate(args: argparse.Namespace) -> int:
+    from cycles.vlm_local.calibration import fit_and_freeze_calibrator
+
+    result = fit_and_freeze_calibrator(
+        predictions_path=args.predictions,
+        labels_path=args.labels,
+        output_path=args.output,
+    )
+    print(f"Fitted temperature: {result['temperature']:.4f} across {result['sample_count']} sample(s)")
+    print(f"NLL: {result['pre_nll']:.4f} -> {result['post_nll']:.4f}")
+    print(f"Brier score: {result['pre_brier']:.4f} -> {result['post_brier']:.4f}")
+    print(f"Calibrator SHA-256: {result['calibrator_hash']}")
+    print(f"Wrote calibrator to {args.output}")
     return 0
 
 
@@ -574,7 +638,21 @@ def build_parser() -> argparse.ArgumentParser:
             "Roughly 3x slower; use when a run must match records produced without reuse."
         ),
     )
+    vlm_local.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume interrupted inference by skipping images already recorded in --output",
+    )
     vlm_local.set_defaults(func=_cmd_vlm_local)
+
+    vlm_calibrate = subparsers.add_parser(
+        "vlm-calibrate",
+        help="Fit and freeze temperature calibrator from validation predictions",
+    )
+    vlm_calibrate.add_argument("--predictions", type=_existing_file, required=True)
+    vlm_calibrate.add_argument("--labels", type=_existing_file, required=True)
+    vlm_calibrate.add_argument("--output", type=Path, required=True)
+    vlm_calibrate.set_defaults(func=_cmd_vlm_calibrate)
 
     vlm_prepare = subparsers.add_parser(
         "vlm-prepare-sft", help="Prepare auditable single-image MLX-VLM SFT data"

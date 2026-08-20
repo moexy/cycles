@@ -104,9 +104,16 @@
 
 ## P2 — operational hardening
 
-- [ ] Add a dedicated CLI command to fit and freeze a calibrator from validation raw scores.
-- [ ] Add temporal subset and calibrated-versus-uncalibrated gates directly to `vlm-benchmark`.
-- [ ] Add interruption-safe resume/checkpoint behavior for large local inference folders.
+- [x] Add a dedicated CLI command to fit and freeze a calibrator from validation raw scores.
+  Implemented `cycles vlm-calibrate` and `cycles.vlm_local.calibration.fit_and_freeze_calibrator`,
+  saving versioned JSON calibrators with pre/post NLL and Brier score tracking.
+- [x] Add temporal subset and calibrated-versus-uncalibrated gates directly to `vlm-benchmark`.
+  Calculates uncalibrated ECE/Brier against calibrated outputs (`calibration_brier_noninferior` gate)
+  and evaluates sequential reconciliation vs image-level baseline (`temporal_noninferiority` gate,
+  with `adjusted_subset` and `uncertain_subset` breakdown).
+- [x] Add interruption-safe resume/checkpoint behavior for large local inference folders.
+  Implemented `--resume` in `cycles vlm-local`, streaming individual predictions to disk as completed
+  and recovering seamlessly from partial or interrupted runs.
 - [ ] Decide and validate how temporal reconciliation handles repeated observations and irregular
   day gaps; the current transition matrix advances once per record, not once per elapsed day.
 - [ ] Reassess multi-image SFT only after the upstream Qwen3-VL collation issue is demonstrably fixed.

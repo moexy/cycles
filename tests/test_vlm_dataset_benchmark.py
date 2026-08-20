@@ -502,3 +502,56 @@ def test_benchmark_flags_predictions_that_never_declared_a_prefill_mode(tmp_path
         benchmark_predictions(
             predictions, labels, tmp_path / "report", require_prefill_mode="on"
         )
+
+
+def test_benchmark_reports_calibration_comparison_and_temporal_gates(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    labels = tmp_path / "labels.csv"
+
+    rows = [
+        {
+            "sample_id": "s1",
+            "image_prediction": {
+                "primary_stage": "diestrus",
+                "raw_scores": {"diestrus": 4.0, "proestrus": 0.0, "estrus": 0.0, "metestrus": 0.0},
+                "probabilities": {"diestrus": 0.85, "proestrus": 0.05, "estrus": 0.05, "metestrus": 0.05},
+                "confidence_tier": "high",
+            },
+            "sequence_prediction": {
+                "final_stage": "diestrus",
+                "adjusted": False,
+                "reason": "image_only",
+            },
+        },
+        {
+            "sample_id": "s2",
+            "image_prediction": {
+                "primary_stage": "proestrus",
+                "raw_scores": {"diestrus": 0.0, "proestrus": 1.0, "estrus": 0.8, "metestrus": 0.0},
+                "probabilities": {"diestrus": 0.1, "proestrus": 0.45, "estrus": 0.35, "metestrus": 0.1},
+                "confidence_tier": "low",
+            },
+            "sequence_prediction": {
+                "final_stage": "estrus",
+                "adjusted": True,
+                "reason": "reconciled_progression",
+            },
+        },
+    ]
+    predictions.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    labels.write_text("sample_id,stage\ns1,diestrus\ns2,estrus\n", encoding="utf-8")
+
+    report = benchmark_predictions(predictions, labels, tmp_path / "report")
+
+    assert "uncalibrated_ece" in report["calibration"]
+    assert "uncalibrated_brier_score" in report["calibration"]
+    assert "brier_score_delta" in report["calibration"]
+    assert "calibration_brier_noninferior" in report["gates"]
+
+    assert "temporal" in report
+    assert report["temporal"]["adjusted_samples_count"] == 1
+    assert report["temporal"]["adjusted_subset"] is not None
+    assert report["temporal"]["uncertain_subset"] is not None
+    assert "temporal_noninferiority" in report["gates"]
+    assert report["gates"]["temporal_noninferiority"] is True
+

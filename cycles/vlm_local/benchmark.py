@@ -96,6 +96,75 @@ def benchmark_predictions(
             "calibration_ece": round(_ece(y_true, y_pred, confidences), 10) <= 0.10,
         },
     }
+    if all("raw_scores" in p for _, p in matched):
+        uncalibrated_probs: list[dict[str, float]] = []
+        for _, p in matched:
+            raw = p["raw_scores"]
+            max_val = max(raw.values())
+            exps = {st: math.exp(raw[st] - max_val) for st in CANONICAL}
+            tot = sum(exps.values())
+            uncalibrated_probs.append({st: val / tot for st, val in exps.items()})
+        uncal_confidences = [max(values.values()) for values in uncalibrated_probs]
+        uncal_preds = [max(values, key=values.get) for values in uncalibrated_probs]
+        uncal_ece = _ece(y_true, uncal_preds, uncal_confidences)
+        uncal_brier = _brier(y_true, uncalibrated_probs)
+        cal_brier = report["calibration"]["brier_score"]
+        report["calibration"]["uncalibrated_ece"] = round(uncal_ece, 10)
+        report["calibration"]["uncalibrated_brier_score"] = round(uncal_brier, 10)
+        report["calibration"]["brier_score_delta"] = round(cal_brier - uncal_brier, 10)
+        report["gates"]["calibration_brier_noninferior"] = cal_brier <= uncal_brier + 1e-6
+
+    has_sequence = all(
+        p.get("sequence_prediction") is not None
+        and p["sequence_prediction"].get("final_stage") in CANONICAL
+        for _, p in matched
+    )
+    if has_sequence:
+        seq_preds = [p["sequence_prediction"]["final_stage"] for _, p in matched]
+        seq_metrics = compute_classification_metrics(y_true, seq_preds, labels=CANONICAL)
+        delta_f1 = seq_metrics.macro_f1 - metrics.macro_f1
+        adjusted_indices = [
+            i for i, (_, p) in enumerate(matched) if p["sequence_prediction"].get("adjusted")
+        ]
+        adjusted_metrics = None
+        if adjusted_indices:
+            adj_true = [y_true[i] for i in adjusted_indices]
+            adj_img = [y_pred[i] for i in adjusted_indices]
+            adj_seq = [seq_preds[i] for i in adjusted_indices]
+            adj_img_f1 = compute_classification_metrics(adj_true, adj_img, labels=CANONICAL).macro_f1
+            adj_seq_f1 = compute_classification_metrics(adj_true, adj_seq, labels=CANONICAL).macro_f1
+            adjusted_metrics = {
+                "count": len(adjusted_indices),
+                "image_macro_f1": round(adj_img_f1, 10),
+                "sequence_macro_f1": round(adj_seq_f1, 10),
+                "macro_f1_delta": round(adj_seq_f1 - adj_img_f1, 10),
+            }
+        uncertain_indices = [
+            i for i, (_, p) in enumerate(matched) if p.get("confidence_tier") in {"low", "medium"}
+        ]
+        uncertain_metrics = None
+        if uncertain_indices:
+            unc_true = [y_true[i] for i in uncertain_indices]
+            unc_img = [y_pred[i] for i in uncertain_indices]
+            unc_seq = [seq_preds[i] for i in uncertain_indices]
+            unc_img_f1 = compute_classification_metrics(unc_true, unc_img, labels=CANONICAL).macro_f1
+            unc_seq_f1 = compute_classification_metrics(unc_true, unc_seq, labels=CANONICAL).macro_f1
+            uncertain_metrics = {
+                "count": len(uncertain_indices),
+                "image_macro_f1": round(unc_img_f1, 10),
+                "sequence_macro_f1": round(unc_seq_f1, 10),
+                "macro_f1_delta": round(unc_seq_f1 - unc_img_f1, 10),
+            }
+        report["temporal"] = {
+            "image_macro_f1": round(metrics.macro_f1, 10),
+            "sequence_macro_f1": round(seq_metrics.macro_f1, 10),
+            "macro_f1_delta": round(delta_f1, 10),
+            "adjusted_samples_count": len(adjusted_indices),
+            "adjusted_subset": adjusted_metrics,
+            "uncertain_subset": uncertain_metrics,
+        }
+        report["gates"]["temporal_noninferiority"] = delta_f1 >= -0.01
+
     report["run_configuration"] = configuration
     report["gates"]["prefill_mode_declared"] = configuration["prompt_prefix_reuse"] != UNSPECIFIED
     if baseline_predictions is not None:
@@ -253,10 +322,25 @@ def _read_predictions(path: Path) -> tuple[dict[str, dict[str, Any]], dict[str, 
                 raise ValueError(
                     f"primary_stage must match the largest probability on row {line_number}"
                 )
-            predictions[sample_id] = {
+            pred_item: dict[str, Any] = {
                 "primary_stage": primary,
                 "probabilities": parsed,
             }
+            raw_scores = image_prediction.get("raw_scores")
+            if isinstance(raw_scores, dict) and set(raw_scores) == set(CANONICAL):
+                if all(math.isfinite(float(val)) for val in raw_scores.values()):
+                    pred_item["raw_scores"] = {st: float(raw_scores[st]) for st in CANONICAL}
+            conf_tier = image_prediction.get("confidence_tier")
+            if isinstance(conf_tier, str):
+                pred_item["confidence_tier"] = conf_tier.strip().lower()
+            seq_pred = payload.get("sequence_prediction")
+            if isinstance(seq_pred, dict):
+                pred_item["sequence_prediction"] = {
+                    "final_stage": seq_pred.get("final_stage"),
+                    "adjusted": bool(seq_pred.get("adjusted", False)),
+                    "reason": str(seq_pred.get("reason", "")),
+                }
+            predictions[sample_id] = pred_item
     return predictions, _frozen_configuration(observed, path)
 
 
