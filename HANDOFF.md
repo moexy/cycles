@@ -1,5 +1,10 @@
 # `cycles` — Rodent Estrous Phase Assessment & Tracking Platform
 
+> **2026-08-20 MLX-VLM v3 addendum:** A morphology-first local VLM implementation is in progress
+> on `feature/estrous-mlx-v3`. Its current state, verification evidence, and remaining scientific
+> work are documented in [`HANDOFF_MLX_V3.md`](HANDOFF_MLX_V3.md). That addendum supersedes this
+> file wherever the older endpoint-VLM or simulated cell-centric design conflicts with v3.
+
 **Repository:** `https://github.com/moexy/cycles.git`  
 **Date:** 2026-08-20  
 **Status:** All 105 unit/integration tests passing (`100% green`), `ruff check .` clean (0 errors), validated end-to-end on high-resolution OME-TIFF slides and the multi-lab 13,625-image EstrousBank benchmark corpus.

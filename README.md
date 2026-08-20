@@ -143,3 +143,24 @@ that build cellular measurements or write portable checkpoints.
 analysis. Predictions and quality-control flags should be reviewed in the context of the
 imaging protocol, staining method, model validation data, and study design; they are not
 a substitute for expert review when experimental decisions require manual confirmation.
+## Morphology-first local VLM workflow
+
+Apple-Silicon dependencies are optional:
+
+```bash
+uv sync --extra mlx
+```
+
+Run local inference without sequence context:
+
+```bash
+cycles vlm-local --input slides/ --model mlx-community/Qwen3-VL-8B-Instruct-4bit \
+  --output runs/vlm/results.jsonl
+```
+
+Add a frozen calibrator and the exact `sample_id,image_path,subject_id,day` sequence manifest to
+enable guarded adjacent-stage reconciliation. Review the resulting JSONL in the GUI's `VLM Review`
+tab; reviews are append-only and teacher export is explicit.
+
+See `docs/superpowers/specs/2026-08-20-estrous-cytology-mlx-v3-design.md` for the blinded annotation,
+training, provenance, and acceptance-gate design.

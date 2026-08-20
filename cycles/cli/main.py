@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from collections.abc import Sequence
@@ -25,6 +26,13 @@ def _existing_file(value: str) -> Path:
     path = Path(value).expanduser()
     if not path.is_file():
         raise argparse.ArgumentTypeError(f"file does not exist: {path}")
+    return path
+
+
+def _existing_path(value: str) -> Path:
+    path = Path(value).expanduser()
+    if not path.exists():
+        raise argparse.ArgumentTypeError(f"path does not exist: {path}")
     return path
 
 
@@ -316,6 +324,161 @@ def _cmd_train(args: argparse.Namespace) -> int:
     return 0
 
 
+_VLM_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+
+
+def _build_local_vlm_pipeline(
+    model: str,
+    adapter: Path | None,
+    model_revision: str,
+    calibrator_path: Path | None,
+) -> Any:
+    from cycles.vlm_local.backend import MLXVLMBackend
+    from cycles.vlm_local.calibration import TemperatureCalibrator
+    from cycles.vlm_local.pipeline import LocalVLMPipeline
+
+    backend = MLXVLMBackend(
+        model,
+        adapter_path=adapter,
+        model_revision=model_revision,
+    )
+    lock_path = Path("uv.lock")
+    lock_hash = hashlib.sha256(lock_path.read_bytes()).hexdigest() if lock_path.is_file() else "unlocked"
+    calibrator = TemperatureCalibrator.load(calibrator_path) if calibrator_path else None
+    return LocalVLMPipeline(
+        backend,
+        software_lock_hash=lock_hash,
+        calibrator=calibrator,
+    )
+
+
+def _build_temporal_reconciler(margin_threshold: float, adjustment_threshold: float) -> Any:
+    from cycles.vlm_local.temporal import TemporalReconciler
+
+    return TemporalReconciler(
+        margin_threshold=margin_threshold,
+        adjustment_threshold=adjustment_threshold,
+    )
+
+
+def _vlm_input_images(input_path: Path) -> list[Path]:
+    if input_path.is_file():
+        if input_path.suffix.lower() not in _VLM_IMAGE_SUFFIXES:
+            raise ValueError(f"unsupported image format: {input_path}")
+        return [input_path.resolve()]
+    images = sorted(
+        path.resolve()
+        for path in input_path.rglob("*")
+        if path.is_file() and path.suffix.lower() in _VLM_IMAGE_SUFFIXES
+    )
+    if not images:
+        raise ValueError(f"no supported images found in {input_path}")
+    return images
+
+
+def _read_vlm_sequence_manifest(path: Path) -> dict[Path, dict[str, Any]]:
+    required = ["sample_id", "image_path", "subject_id", "day"]
+    rows: dict[Path, dict[str, Any]] = {}
+    sample_ids: set[str] = set()
+    with path.open(newline="", encoding="utf-8-sig") as stream:
+        reader = csv.DictReader(stream)
+        if reader.fieldnames != required:
+            raise ValueError(
+                "sequence manifest columns must be exactly: " + ",".join(required)
+            )
+        for row_number, row in enumerate(reader, start=2):
+            sample_id = (row.get("sample_id") or "").strip()
+            subject_id = (row.get("subject_id") or "").strip()
+            raw_image = (row.get("image_path") or "").strip()
+            if not sample_id or not subject_id or not raw_image:
+                raise ValueError(f"sequence manifest row {row_number} has empty required values")
+            image_path = Path(raw_image).expanduser()
+            if not image_path.is_absolute():
+                image_path = path.parent / image_path
+            image_path = image_path.resolve()
+            if not image_path.is_file():
+                raise FileNotFoundError(f"sequence image not found: {image_path}")
+            if sample_id in sample_ids or image_path in rows:
+                raise ValueError(f"duplicate sample or image on sequence manifest row {row_number}")
+            try:
+                day = float((row.get("day") or "").strip())
+            except ValueError as exc:
+                raise ValueError(f"invalid day on sequence manifest row {row_number}") from exc
+            sample_ids.add(sample_id)
+            rows[image_path] = {
+                "sample_id": sample_id,
+                "subject_id": subject_id,
+                "day": day,
+            }
+    return rows
+
+
+def _cmd_vlm_local(args: argparse.Namespace) -> int:
+    images = _vlm_input_images(args.input)
+    manifest = (
+        _read_vlm_sequence_manifest(args.sequence_manifest)
+        if args.sequence_manifest is not None
+        else None
+    )
+    pipeline = _build_local_vlm_pipeline(
+        args.model,
+        args.adapter,
+        args.model_revision,
+        args.calibrator,
+    )
+    records = []
+    for index, image_path in enumerate(images, start=1):
+        metadata = manifest.get(image_path) if manifest is not None else None
+        if manifest is not None and metadata is None:
+            raise ValueError(f"input image is absent from sequence manifest: {image_path}")
+        metadata = metadata or {
+            "sample_id": image_path.stem,
+            "subject_id": None,
+            "day": None,
+        }
+        records.append(
+            pipeline.classify_image(
+                image_path,
+                sample_id=metadata["sample_id"],
+                subject_id=metadata["subject_id"],
+                day=metadata["day"],
+            )
+        )
+        _progress(index, len(images), f"Classified {image_path.name}")
+    if manifest is not None:
+        records = _build_temporal_reconciler(
+            args.margin_threshold,
+            args.adjustment_threshold,
+        ).reconcile(records)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", encoding="utf-8") as stream:
+        for record in records:
+            stream.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
+    print(f"Classified {len(records)} image(s); wrote {args.output}")
+    return 0
+
+
+def _cmd_vlm_prepare_sft(args: argparse.Namespace) -> int:
+    from cycles.vlm_local.datasets import prepare_sft_dataset
+
+    summary = prepare_sft_dataset(args.source, args.input, args.output)
+    print(f"Prepared {sum(summary['samples_by_split'].values())} sample(s) in {args.output}")
+    return 0
+
+
+def _cmd_vlm_benchmark(args: argparse.Namespace) -> int:
+    from cycles.vlm_local.benchmark import benchmark_predictions
+
+    report = benchmark_predictions(
+        args.predictions,
+        args.labels,
+        args.output,
+        baseline_predictions=args.baseline_predictions,
+    )
+    print(f"Benchmarked {report['matched_samples']} sample(s); wrote {args.output / 'report.json'}")
+    return 0
+
+
 
 def _cmd_gui(args: argparse.Namespace) -> int:
     from cycles.gui.app import main as gui_main
@@ -377,6 +540,39 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--no-freeze", action="store_true", help="Train all layers instead of freezing backbone")
     train.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
     train.set_defaults(func=_cmd_train)
+
+    vlm_local = subparsers.add_parser(
+        "vlm-local", help="Run morphology-first local MLX-VLM staging"
+    )
+    vlm_local.add_argument("--input", type=_existing_path, required=True)
+    vlm_local.add_argument("--model", required=True)
+    vlm_local.add_argument("--output", type=Path, required=True)
+    vlm_local.add_argument("--adapter", type=Path)
+    vlm_local.add_argument("--model-revision", default="unspecified")
+    vlm_local.add_argument("--calibrator", type=_existing_file)
+    vlm_local.add_argument("--sequence-manifest", type=_existing_file)
+    vlm_local.add_argument("--margin-threshold", type=float, default=0.15)
+    vlm_local.add_argument("--adjustment-threshold", type=float, default=0.0)
+    vlm_local.set_defaults(func=_cmd_vlm_local)
+
+    vlm_prepare = subparsers.add_parser(
+        "vlm-prepare-sft", help="Prepare auditable single-image MLX-VLM SFT data"
+    )
+    vlm_prepare.add_argument(
+        "--source", choices=("estrousbank", "blind-teacher"), required=True
+    )
+    vlm_prepare.add_argument("--input", type=_existing_path, required=True)
+    vlm_prepare.add_argument("--output", type=Path, required=True)
+    vlm_prepare.set_defaults(func=_cmd_vlm_prepare_sft)
+
+    vlm_benchmark = subparsers.add_parser(
+        "vlm-benchmark", help="Evaluate local VLM JSONL predictions"
+    )
+    vlm_benchmark.add_argument("--predictions", type=_existing_file, required=True)
+    vlm_benchmark.add_argument("--baseline-predictions", type=_existing_file)
+    vlm_benchmark.add_argument("--labels", type=_existing_file, required=True)
+    vlm_benchmark.add_argument("--output", type=Path, required=True)
+    vlm_benchmark.set_defaults(func=_cmd_vlm_benchmark)
 
     gui = subparsers.add_parser("gui", help="Launch the PySide6 desktop application")
     gui.add_argument("--checkpoint", type=Path)

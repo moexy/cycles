@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStatusBar,
     QStyle,
+    QTabWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -34,6 +35,7 @@ from PySide6.QtWidgets import (
 
 from cycles.core.types import EstrousStage
 from cycles.gui.canvas import PHASE_COLORS, CycleTimelineCanvas, ImageOverlayCanvas
+from cycles.gui.vlm_review import VLMReviewWorkspace
 from cycles.gui.workers import ClassificationWorker
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
@@ -162,7 +164,11 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setStretchFactor(2, 0)
-        self.setCentralWidget(splitter)
+        self.workspace_tabs = QTabWidget(self)
+        self.workspace_tabs.addTab(splitter, "Staging")
+        self.vlm_review_workspace = VLMReviewWorkspace(parent=self.workspace_tabs)
+        self.workspace_tabs.addTab(self.vlm_review_workspace, "VLM Review")
+        self.setCentralWidget(self.workspace_tabs)
 
         status = QStatusBar(self)
         self.status_label = QLabel("Select an image folder to begin")
