@@ -17,6 +17,22 @@
   causes fixed in `471b536`: a repair round-trip on every confident image, no prefix reuse between
   the two passes, and an underspecified stage prompt. Now 21 s/image, ~2 h for the 343 teacher
   images.
+- [x] Measure the view-pack resolution tradeoff. Halving the quadrant edge to 792 px is 1.82x faster
+  and 2.02x cheaper in tokens (24.6 s -> 13.5 s median over 24 training images, `quadrant_max_edge`
+  in `build_view_pack`, raw results in `docs/ablation-quadrant-resolution-2026-08-20.json`). Stage
+  agreement was 24/24 but is uninformative because the model was a constant predictor; the morphology
+  pass changed cornified_squames on 3/24 and leukocytes on 4/24 images.
+- [ ] Re-run the resolution ablation as an accuracy comparison once teacher labels exist. Agreement
+  cannot adjudicate which resolution is right; do not lower resolution before then.
+- [ ] **Blocking, ahead of the bakeoff: establish whether any candidate can stage zero-shot.**
+  Qwen3-VL 4B 8-bit scores 0/4 on textbook-unambiguous synthetic morphologies at high confidence and
+  returns a single stage for every real image. Run the same four synthetic cases against Qwen3-VL 8B
+  4-bit and Gemma 3 12B 4-bit before spending the full bakeoff; a model that cannot separate the four
+  textbook descriptions will not be separated by a group-bootstrap comparison on real slides.
+- [ ] Reconsider what the zero-shot bakeoff is for. If no candidate stages usefully zero-shot, the
+  accuracy-first comparison is measuring noise and the adapter is doing all the work; select the
+  base model on morphology-pass quality, memory, and latency instead, and compare stage accuracy
+  only after fine-tuning.
 - [ ] Decide the view-pack resolution/accuracy tradeoff before the bakeoff. The pack sends 8.81 MP
   (a 1536-edge overview plus four full-resolution quadrants) from a 2880x2048 source, which is
   8,843 tokens and ~16 s of the remaining 21 s. Halving the quadrant edge would cut that roughly
