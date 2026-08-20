@@ -49,9 +49,30 @@ def _fake_mlx_vlm(captured: dict[str, object]) -> ModuleType:
     return fake
 
 
+class FakePromptCacheState:
+    """Mirrors mlx_vlm.generate.common.PromptCacheState's identity semantics."""
+
+    instances = 0
+
+    def __init__(self) -> None:
+        type(self).instances += 1
+        self.cache = None
+        self.token_ids = None
+
+
+def _install_fake_mlx_vlm(monkeypatch, captured: dict[str, object]) -> None:
+    monkeypatch.setitem(sys.modules, "mlx_vlm", _fake_mlx_vlm(captured))
+    common = ModuleType("mlx_vlm.generate.common")
+    common.PromptCacheState = FakePromptCacheState  # type: ignore[attr-defined]
+    generate_pkg = ModuleType("mlx_vlm.generate")
+    generate_pkg.common = common  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mlx_vlm.generate", generate_pkg)
+    monkeypatch.setitem(sys.modules, "mlx_vlm.generate.common", common)
+
+
 def test_mlx_backend_materializes_lossless_paths_for_installed_api(monkeypatch) -> None:
     captured: dict[str, object] = {}
-    monkeypatch.setitem(sys.modules, "mlx_vlm", _fake_mlx_vlm(captured))
+    _install_fake_mlx_vlm(monkeypatch, captured)
     backend = MLXVLMBackend("test/model", model_revision="rev-1")
 
     response = backend.generate(
@@ -61,14 +82,16 @@ def test_mlx_backend_materializes_lossless_paths_for_installed_api(monkeypatch) 
 
     assert response == '{"ok": true}'
     assert captured["load"] == ("test/model", {"revision": "rev-1"})
-    assert captured["kwargs"] == {"max_tokens": 1024, "verbose": False}
+    kwargs = dict(captured["kwargs"])  # type: ignore[arg-type]
+    kwargs.pop("prompt_cache_state")
+    assert kwargs == {"max_tokens": 1024, "verbose": False}
     assert all(not path.exists() for path in captured["paths"])
 
 
 def test_mlx_backend_applies_chat_template_with_one_token_per_view(monkeypatch) -> None:
     """Each materialized view needs its own placeholder or the scatter fails."""
     captured: dict[str, object] = {}
-    monkeypatch.setitem(sys.modules, "mlx_vlm", _fake_mlx_vlm(captured))
+    _install_fake_mlx_vlm(monkeypatch, captured)
     backend = MLXVLMBackend("test/model")
 
     backend.generate([Image.new("RGB", (8, 8))] * 4, "inspect")
@@ -77,3 +100,23 @@ def test_mlx_backend_applies_chat_template_with_one_token_per_view(monkeypatch) 
     assert template["num_images"] == 4  # type: ignore[index]
     assert template["prompt"] == "inspect"  # type: ignore[index]
     assert str(captured["prompt"]).count(IMAGE_TOKEN) == 4
+
+
+def test_prompt_cache_is_shared_across_passes_and_reset_between_slides(monkeypatch) -> None:
+    """Both passes over one slide share the image prefix; a new slide must not."""
+    captured: dict[str, object] = {}
+    _install_fake_mlx_vlm(monkeypatch, captured)
+    FakePromptCacheState.instances = 0
+    backend = MLXVLMBackend("test/model")
+
+    slide = [Image.new("RGB", (8, 8), "red")]
+    first = backend._cache_state_for(("digest-a",))
+    second = backend._cache_state_for(("digest-a",))
+    assert first is second, "the second pass must reuse the first pass's KV prefix"
+
+    third = backend._cache_state_for(("digest-b",))
+    assert third is not first, "a different slide must not inherit cached state"
+    assert FakePromptCacheState.instances == 2
+
+    backend.generate(slide, "inspect")
+    assert captured["kwargs"]["prompt_cache_state"] is not None  # type: ignore[index]

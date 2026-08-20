@@ -106,7 +106,11 @@ class ImagePrediction:
         if primary is None:
             raise ValueError("primary_stage must be one of the four canonical stages")
         if secondary == primary:
-            raise ValueError("secondary_stage must differ from primary_stage")
+            # A maximally confident model names the same stage twice, meaning
+            # "no distinct runner-up". That is an answer, not malformed output;
+            # rejecting it forced a full repair round-trip on every confident
+            # image, re-encoding the whole view pack to learn nothing.
+            secondary = None
         raw_scores = _stage_map(payload["raw_scores"], normalise=False)
         probabilities = _stage_map(payload["probabilities"], normalise=True)
         # Compare probability values rather than sorted-key identity. A confident

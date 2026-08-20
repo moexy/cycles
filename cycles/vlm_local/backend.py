@@ -28,9 +28,11 @@ class MLXVLMBackend:
         adapter_path: Path | str | None = None,
         model_revision: str = "unspecified",
         max_tokens: int = 1024,
+        reuse_prompt_prefix: bool = True,
     ) -> None:
         try:
             from mlx_vlm import apply_chat_template, generate, load
+            from mlx_vlm.generate.common import PromptCacheState
         except ImportError as exc:
             raise RuntimeError(
                 "Local VLM inference requires the optional 'mlx' dependencies on Apple Silicon"
@@ -47,6 +49,10 @@ class MLXVLMBackend:
             load_kwargs["revision"] = model_revision
         self._model, self._processor = load(model_id, **load_kwargs)
         self._max_tokens = max_tokens
+        self._prompt_cache_state_factory = PromptCacheState
+        self._reuse_prompt_prefix = reuse_prompt_prefix
+        self._cache_signature: tuple[str, ...] | None = None
+        self._prompt_cache_state: Any = None
 
     @property
     def provenance(self) -> dict[str, str]:
@@ -54,6 +60,11 @@ class MLXVLMBackend:
             "model_id": self._model_id,
             "model_revision": self._model_revision,
             "adapter_hash": _path_hash(self._adapter_path) if self._adapter_path else "none",
+            # Reusing the KV prefix is a different, self-consistent numeric path:
+            # repeated runs agree, but reused and cold prefill can disagree on
+            # knife-edge images. Records are only comparable at a fixed setting,
+            # so the setting travels with the record.
+            "prompt_prefix_reuse": "on" if self._reuse_prompt_prefix else "off",
         }
 
     def generate(self, images: Sequence[Image.Image], prompt: str) -> str:
@@ -62,10 +73,13 @@ class MLXVLMBackend:
         # recompression and are removed immediately after generation.
         with TemporaryDirectory(prefix="cycles-mlx-views-") as temporary:
             paths = []
+            digests = []
             for index, image in enumerate(images):
                 path = Path(temporary) / f"view-{index}.png"
                 image.save(path, format="PNG")
                 paths.append(str(path))
+                digests.append(hashlib.sha256(image.tobytes()).hexdigest())
+            signature = tuple(digests)
             # generate() does not apply the chat template; without it the prompt
             # carries no image placeholder tokens and the vision embedding has
             # nowhere to scatter, so the model raises a broadcast error.
@@ -82,8 +96,25 @@ class MLXVLMBackend:
                 image=paths,
                 max_tokens=self._max_tokens,
                 verbose=False,
+                prompt_cache_state=self._cache_state_for(signature),
             )
             return str(getattr(result, "text", result))
+
+    def _cache_state_for(self, signature: tuple[str, ...]) -> Any:
+        """Reuse the KV prefix while consecutive calls share the same views.
+
+        Both passes over one slide send an identical view pack and differ only in
+        the trailing instruction, so the image tokens are a common prefix worth
+        thousands of tokens of prefill. mlx-vlm reuses it only when the diverging
+        suffix is text-only, which holds here. A new slide changes the signature
+        and gets a fresh cache, so no state crosses images.
+        """
+        if not self._reuse_prompt_prefix:
+            return None
+        if signature != self._cache_signature:
+            self._cache_signature = signature
+            self._prompt_cache_state = self._prompt_cache_state_factory()
+        return self._prompt_cache_state
 
 
 def _path_hash(path: Path) -> str:

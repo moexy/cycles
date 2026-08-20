@@ -53,7 +53,36 @@ def test_vlm_local_writes_jsonl_and_applies_sequence_manifest(tmp_path: Path, mo
     status = cli.main(["vlm-local", "--input", str(image), "--model", "test/model", "--output", str(output), "--sequence-manifest", str(manifest), "--calibrator", str(calibrator)])
 
     assert status == 0
-    builder.assert_called_once_with("test/model", None, "unspecified", calibrator)
+    builder.assert_called_once_with(
+        "test/model", None, "unspecified", calibrator, reuse_prompt_prefix=True
+    )
     pipeline.classify_image.assert_called_once_with(image.resolve(), sample_id="s1", subject_id="mouse-1", day=4.0)
     reconciler.reconcile.assert_called_once_with([record])
     assert json.loads(output.read_text()) == record.to_dict()
+
+
+def test_vlm_local_can_disable_prompt_prefix_reuse(monkeypatch, tmp_path: Path) -> None:
+    """A frozen run must be able to force cold prefill to match older records."""
+    image = tmp_path / "slide.png"
+    Image.new("RGB", (8, 8)).save(image)
+    output = tmp_path / "results.jsonl"
+    record = SimpleNamespace(
+        to_dict=lambda: {"sample_id": "s1", "sequence_prediction": {"final_stage": "estrus"}}
+    )
+    pipeline = MagicMock()
+    pipeline.classify_image.return_value = record
+    builder = MagicMock(return_value=pipeline)
+    monkeypatch.setattr(cli, "_build_local_vlm_pipeline", builder)
+
+    status = cli.main(
+        [
+            "vlm-local",
+            "--input", str(image),
+            "--model", "test/model",
+            "--output", str(output),
+            "--no-prompt-prefix-reuse",
+        ]
+    )
+
+    assert status == 0
+    assert builder.call_args.kwargs["reuse_prompt_prefix"] is False

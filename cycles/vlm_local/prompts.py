@@ -6,7 +6,7 @@ import json
 
 from cycles.vlm_local.schema import MorphologyObservation
 
-PROMPT_VERSION = "morphology-first-v1"
+PROMPT_VERSION = "morphology-first-v2"
 
 
 MORPHOLOGY_PROMPT = """You are reviewing five views from one rodent vaginal cytology slide: a whole-field overview followed by four overlapping quadrants.
@@ -37,7 +37,16 @@ def stage_prompt(morphology: MorphologyObservation) -> str:
     return f"""Score the same slide against the four canonical stages: diestrus, proestrus, estrus, and metestrus.
 Use the images and the stage-blind morphology below. Do not invent findings that are absent from the evidence.
 Morphology: {json.dumps(payload, sort_keys=True)}
-Return JSON only with raw_scores and probabilities objects containing all four stages, primary_stage, secondary_stage, confidence_tier (low|medium|high), and a concise evidence-bound rationale."""
+Return JSON only, with these exact fields:
+- raw_scores: object with all four stage names as keys and unbounded numeric scores as values
+- probabilities: object with all four stage names as keys, each at least 0, together summing to 1
+- primary_stage: exactly one of diestrus|proestrus|estrus|metestrus, the stage with the highest probability
+- secondary_stage: the stage with the second-highest probability, or null if no runner-up is distinguishable
+- confidence_tier: low|medium|high
+- rationale: one concise evidence-bound paragraph
+Never answer "unknown", "unclear", or "indeterminate", and never return all-zero probabilities. Weak or
+conflicting evidence is reported by choosing the best-supported stage and setting confidence_tier to low;
+slide-level unreadability was already recorded by the preceding morphology pass."""
 
 
 def repair_prompt(response: str, error: Exception) -> str:

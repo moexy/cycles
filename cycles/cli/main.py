@@ -332,6 +332,7 @@ def _build_local_vlm_pipeline(
     adapter: Path | None,
     model_revision: str,
     calibrator_path: Path | None,
+    reuse_prompt_prefix: bool = True,
 ) -> Any:
     from cycles.vlm_local.backend import MLXVLMBackend
     from cycles.vlm_local.calibration import TemperatureCalibrator
@@ -341,6 +342,7 @@ def _build_local_vlm_pipeline(
         model,
         adapter_path=adapter,
         model_revision=model_revision,
+        reuse_prompt_prefix=reuse_prompt_prefix,
     )
     lock_path = Path("uv.lock")
     lock_hash = hashlib.sha256(lock_path.read_bytes()).hexdigest() if lock_path.is_file() else "unlocked"
@@ -425,6 +427,7 @@ def _cmd_vlm_local(args: argparse.Namespace) -> int:
         args.adapter,
         args.model_revision,
         args.calibrator,
+        reuse_prompt_prefix=not args.no_prompt_prefix_reuse,
     )
     records = []
     for index, image_path in enumerate(images, start=1):
@@ -553,6 +556,14 @@ def build_parser() -> argparse.ArgumentParser:
     vlm_local.add_argument("--sequence-manifest", type=_existing_file)
     vlm_local.add_argument("--margin-threshold", type=float, default=0.15)
     vlm_local.add_argument("--adjustment-threshold", type=float, default=0.0)
+    vlm_local.add_argument(
+        "--no-prompt-prefix-reuse",
+        action="store_true",
+        help=(
+            "Cold-prefill every pass instead of reusing the shared image prefix. "
+            "Roughly 3x slower; use when a run must match records produced without reuse."
+        ),
+    )
     vlm_local.set_defaults(func=_cmd_vlm_local)
 
     vlm_prepare = subparsers.add_parser(
