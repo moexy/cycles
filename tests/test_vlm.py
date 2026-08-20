@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from cycles.core.types import ClassificationResult, EstrousStage
+from cycles.core.types import EstrousStage
 from cycles.stages.vlm import VLMConfig, VLMInterpretationService
 
 

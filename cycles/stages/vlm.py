@@ -98,9 +98,9 @@ class VLMInterpretationService:
         is_local = "localhost" in self.endpoint_url or "127.0.0.1" in self.endpoint_url
         if not self.api_key and not is_local:
             raise RuntimeError(
-                f"VLM vision interpretation requires an API key or local endpoint. "
-                f"Please set OPENAI_API_KEY, VLM_API_KEY, or configure a local endpoint "
-                f"(VLM_ENDPOINT_URL=http://localhost:11434/v1/chat/completions)."
+                "VLM vision interpretation requires an API key or local endpoint. "
+                "Please set OPENAI_API_KEY, VLM_API_KEY, or configure a local endpoint "
+                "(VLM_ENDPOINT_URL=http://localhost:11434/v1/chat/completions)."
             )
 
         base64_img = self._encode_image(path)
