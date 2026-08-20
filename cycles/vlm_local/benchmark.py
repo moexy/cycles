@@ -17,6 +17,32 @@ from cycles.eval.metrics import compute_classification_metrics
 CANONICAL = ["diestrus", "proestrus", "estrus", "metestrus"]
 SUBGROUP_COLUMNS = ("species", "stain", "lab")
 
+UNSPECIFIED = "unspecified"
+
+# The frozen configuration of a scored run. Every row of one prediction file must
+# agree on all of these, or the file is not a single run and cannot be scored.
+RUN_IDENTITY_FIELDS = (
+    "model_id",
+    "model_revision",
+    "adapter_hash",
+    "calibrator_hash",
+    "prompt_version",
+    "prompt_prefix_reuse",
+    "view_pack_version",
+    "schema_version",
+)
+
+# Fields that must also match between the two sides of a comparison. Model identity
+# and calibrator are deliberately excluded: comparing two models is the point of a
+# bakeoff. Prefix reuse is included because reused and cold prefill are different,
+# self-consistent numeric paths that can disagree on knife-edge images.
+COMPARISON_INVARIANTS = (
+    "prompt_version",
+    "prompt_prefix_reuse",
+    "view_pack_version",
+    "schema_version",
+)
+
 
 def benchmark_predictions(
     predictions_path: Path | str,
@@ -27,8 +53,12 @@ def benchmark_predictions(
     bootstrap_samples: int = 2_000,
     min_subgroup_size: int = 50,
     random_seed: int = 17,
+    require_prefill_mode: str | None = None,
 ) -> dict[str, Any]:
-    predictions = _read_predictions(Path(predictions_path))
+    if require_prefill_mode is not None and require_prefill_mode not in {"on", "off"}:
+        raise ValueError(f"require_prefill_mode must be 'on' or 'off', got {require_prefill_mode!r}")
+    predictions, configuration = _read_predictions(Path(predictions_path))
+    _require_prefill_mode(configuration, require_prefill_mode, "predictions")
     labels = _read_labels(Path(labels_path))
     if set(predictions) != set(labels):
         missing = len(set(labels) - set(predictions))
@@ -66,8 +96,13 @@ def benchmark_predictions(
             "calibration_ece": round(_ece(y_true, y_pred, confidences), 10) <= 0.10,
         },
     }
+    report["run_configuration"] = configuration
+    report["gates"]["prefill_mode_declared"] = configuration["prompt_prefix_reuse"] != UNSPECIFIED
     if baseline_predictions is not None:
-        baseline = _read_predictions(Path(baseline_predictions))
+        baseline, baseline_configuration = _read_predictions(Path(baseline_predictions))
+        _require_prefill_mode(baseline_configuration, require_prefill_mode, "baseline")
+        _require_comparable(configuration, baseline_configuration)
+        report["baseline_run_configuration"] = baseline_configuration
         if set(baseline) != set(labels):
             missing = len(set(labels) - set(baseline))
             extra = len(set(baseline) - set(labels))
@@ -180,13 +215,19 @@ def _subgroup_comparison(
     return {"minimum_size": min_size, "comparisons": comparisons, "violations": violations}
 
 
-def _read_predictions(path: Path) -> dict[str, dict[str, Any]]:
+def _read_predictions(path: Path) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     predictions: dict[str, dict[str, Any]] = {}
+    observed: dict[str, set[str]] = {field: set() for field in RUN_IDENTITY_FIELDS}
     with path.open(encoding="utf-8") as stream:
         for line_number, line in enumerate(stream, start=1):
             if not line.strip():
                 continue
             payload = json.loads(line)
+            provenance = payload.get("provenance")
+            provenance = provenance if isinstance(provenance, dict) else {}
+            for field in RUN_IDENTITY_FIELDS:
+                value = provenance.get(field)
+                observed[field].add(str(value) if value is not None else UNSPECIFIED)
             sample_id = str(payload.get("sample_id", "")).strip()
             image_prediction = payload.get("image_prediction")
             if not sample_id or not isinstance(image_prediction, dict):
@@ -216,7 +257,51 @@ def _read_predictions(path: Path) -> dict[str, dict[str, Any]]:
                 "primary_stage": primary,
                 "probabilities": parsed,
             }
-    return predictions
+    return predictions, _frozen_configuration(observed, path)
+
+
+def _frozen_configuration(observed: dict[str, set[str]], path: Path) -> dict[str, str]:
+    """Reduce per-row provenance to one configuration, or refuse to score the file."""
+    configuration: dict[str, str] = {}
+    for field, values in observed.items():
+        if len(values) > 1:
+            listed = ", ".join(sorted(values))
+            raise ValueError(
+                f"{path} mixes {field} across rows ({listed}); "
+                "a scored run must hold its configuration fixed"
+            )
+        configuration[field] = next(iter(values), UNSPECIFIED)
+    return configuration
+
+
+def _require_prefill_mode(
+    configuration: dict[str, str], expected: str | None, side: str
+) -> None:
+    if expected is None:
+        return
+    actual = configuration["prompt_prefix_reuse"]
+    if actual != expected:
+        raise ValueError(
+            f"{side} were produced with prompt_prefix_reuse={actual!r}, "
+            f"but this run requires {expected!r}"
+        )
+
+
+def _require_comparable(
+    configuration: dict[str, str], baseline_configuration: dict[str, str]
+) -> None:
+    """Reuse and cold prefill are different numeric paths; a comparison must not mix them."""
+    differing = [
+        f"{field}: predictions={configuration[field]!r} baseline={baseline_configuration[field]!r}"
+        for field in COMPARISON_INVARIANTS
+        if configuration[field] != baseline_configuration[field]
+    ]
+    if differing:
+        raise ValueError(
+            "predictions and baseline were not produced under the same frozen configuration ("
+            + "; ".join(differing)
+            + ")"
+        )
 
 
 def _read_labels(path: Path) -> dict[str, dict[str, str]]:

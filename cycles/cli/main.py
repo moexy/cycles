@@ -480,8 +480,11 @@ def _cmd_vlm_benchmark(args: argparse.Namespace) -> int:
         args.labels,
         args.output,
         baseline_predictions=args.baseline_predictions,
+        require_prefill_mode=args.require_prefill_mode,
     )
-    print(f"Benchmarked {report['matched_samples']} sample(s); wrote {args.output / 'report.json'}")
+    mode = report["run_configuration"]["prompt_prefix_reuse"]
+    print(f"Benchmarked {report['matched_samples']} sample(s); prompt_prefix_reuse={mode}")
+    print(f"Wrote {args.output / 'report.json'}")
     return 0
 
 
@@ -590,6 +593,15 @@ def build_parser() -> argparse.ArgumentParser:
     vlm_benchmark.add_argument("--baseline-predictions", type=_existing_file)
     vlm_benchmark.add_argument("--labels", type=_existing_file, required=True)
     vlm_benchmark.add_argument("--output", type=Path, required=True)
+    vlm_benchmark.add_argument(
+        "--require-prefill-mode",
+        choices=("on", "off"),
+        help=(
+            "Refuse to score unless every prediction was produced with this "
+            "prompt_prefix_reuse setting. Pin this for any scored bakeoff: reused and "
+            "cold prefill are different numeric paths and must not be mixed."
+        ),
+    )
     vlm_benchmark.set_defaults(func=_cmd_vlm_benchmark)
 
     gui = subparsers.add_parser("gui", help="Launch the PySide6 desktop application")

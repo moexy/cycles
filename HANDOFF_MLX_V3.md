@@ -14,7 +14,7 @@ scientific accuracy result; no independently labeled evaluation exists yet.
 
 ```text
 env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev   # in sync
-.venv/bin/python -m pytest -q        179 passed
+.venv/bin/python -m pytest -q        184 passed
 .venv/bin/python -m ruff check .     All checks passed!
 mlx 0.32.1  |  mlx-vlm 0.6.15  |  mx.default_device() -> Device(gpu, 0)
 ```
@@ -96,7 +96,35 @@ the model sits near-uniform across stages. On the smoke-test image, warm gave `e
 `estrus 0.289`, with different runner-ups.
 
 Records therefore carry `provenance.prompt_prefix_reuse` (`on`/`off`), and `--no-prompt-prefix-reuse`
-forces cold prefill. **Scored runs must not mix the two modes.**
+forces cold prefill. **Scored runs must not mix the two modes**, and this is now enforced rather
+than merely documented.
+
+`benchmark_predictions` reads `provenance` from every prediction row and reduces it to one frozen
+configuration:
+
+```text
+RUN_IDENTITY_FIELDS      model_id, model_revision, adapter_hash, calibrator_hash,
+                         prompt_version, prompt_prefix_reuse, view_pack_version, schema_version
+COMPARISON_INVARIANTS    prompt_version, prompt_prefix_reuse, view_pack_version, schema_version
+```
+
+A prediction file whose rows disagree on any identity field is not one run and is refused. A
+prediction/baseline comparison is refused unless both sides agree on every comparison invariant.
+Model identity and calibrator are deliberately excluded from the invariants: comparing two models is
+the point of a bakeoff.
+
+Pin the mode explicitly for any scored run:
+
+```bash
+uv run python -m cycles.cli.main vlm-benchmark \
+  --predictions runs/qwen8b.jsonl --baseline-predictions runs/gemma12b.jsonl \
+  --labels teacher/labels.csv --output runs/bakeoff \
+  --require-prefill-mode on
+```
+
+The report records `run_configuration` (and `baseline_run_configuration` when comparing), plus a
+`gates.prefill_mode_declared` flag that is false when predictions carry no provenance at all —
+older files still score, but they score visibly undeclared rather than silently.
 
 ### Measured resource use (Qwen3-VL 4B 8-bit, five views, two passes)
 

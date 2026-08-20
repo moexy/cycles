@@ -344,3 +344,161 @@ def test_benchmark_rejects_partial_sample_coverage(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="sample_id coverage"):
         benchmark_predictions(predictions, labels, tmp_path / "report")
+
+
+def _provenanced_predictions(
+    path: Path,
+    rows: list[tuple[str, str, dict[str, float]]],
+    provenance: list[dict[str, str]],
+) -> None:
+    path.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "sample_id": sample,
+                    "image_prediction": {"primary_stage": stage, "probabilities": probabilities},
+                    "provenance": row_provenance,
+                }
+            )
+            + "\n"
+            for (sample, stage, probabilities), row_provenance in zip(rows, provenance, strict=True)
+        ),
+        encoding="utf-8",
+    )
+
+
+def _labels_csv(path: Path, rows: list[tuple[str, str]]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(
+            stream, fieldnames=["sample_id", "stage", "group_id", "species", "stain", "lab"]
+        )
+        writer.writeheader()
+        for sample, stage in rows:
+            writer.writerow(
+                {
+                    "sample_id": sample,
+                    "stage": stage,
+                    "group_id": sample,
+                    "species": "mouse",
+                    "stain": "alcian blue",
+                    "lab": "local",
+                }
+            )
+
+
+_DIESTRUS = {"diestrus": 0.9, "proestrus": 0.05, "estrus": 0.03, "metestrus": 0.02}
+_ESTRUS = {"diestrus": 0.05, "proestrus": 0.03, "estrus": 0.9, "metestrus": 0.02}
+_ROWS = [("s1", "diestrus", _DIESTRUS), ("s2", "estrus", _ESTRUS)]
+
+
+def _provenance(**overrides: str) -> dict[str, str]:
+    base = {
+        "model_id": "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+        "model_revision": "d" * 40,
+        "adapter_hash": "none",
+        "calibrator_hash": "none",
+        "prompt_version": "morphology-first-v3",
+        "prompt_prefix_reuse": "on",
+        "view_pack_version": "overview-quadrants-v1",
+        "schema_version": "3.0",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_benchmark_rejects_a_file_that_mixes_prefill_modes(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    _provenanced_predictions(
+        predictions,
+        _ROWS,
+        [_provenance(), _provenance(prompt_prefix_reuse="off")],
+    )
+    labels = tmp_path / "labels.csv"
+    _labels_csv(labels, [("s1", "diestrus"), ("s2", "estrus")])
+
+    with pytest.raises(ValueError, match="mixes prompt_prefix_reuse"):
+        benchmark_predictions(predictions, labels, tmp_path / "report")
+
+
+def test_benchmark_rejects_a_comparison_across_prefill_modes(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    baseline = tmp_path / "baseline.jsonl"
+    _provenanced_predictions(predictions, _ROWS, [_provenance(), _provenance()])
+    _provenanced_predictions(
+        baseline,
+        _ROWS,
+        [_provenance(prompt_prefix_reuse="off"), _provenance(prompt_prefix_reuse="off")],
+    )
+    labels = tmp_path / "labels.csv"
+    _labels_csv(labels, [("s1", "diestrus"), ("s2", "estrus")])
+
+    with pytest.raises(ValueError, match="same frozen configuration"):
+        benchmark_predictions(
+            predictions, labels, tmp_path / "report", baseline_predictions=baseline
+        )
+
+
+def test_benchmark_compares_two_models_under_one_frozen_configuration(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    baseline = tmp_path / "baseline.jsonl"
+    _provenanced_predictions(predictions, _ROWS, [_provenance(), _provenance()])
+    other = _provenance(model_id="mlx-community/gemma-3-12b-it-4bit", model_revision="8" * 40)
+    _provenanced_predictions(baseline, _ROWS, [other, other])
+    labels = tmp_path / "labels.csv"
+    _labels_csv(labels, [("s1", "diestrus"), ("s2", "estrus")])
+
+    report = benchmark_predictions(
+        predictions, labels, tmp_path / "report", baseline_predictions=baseline
+    )
+
+    # comparing two models is the point of a bakeoff, so model identity may differ
+    assert report["run_configuration"]["model_id"].endswith("Qwen3-VL-8B-Instruct-4bit")
+    assert report["baseline_run_configuration"]["model_id"].endswith("gemma-3-12b-it-4bit")
+    assert report["run_configuration"]["prompt_prefix_reuse"] == "on"
+    assert report["gates"]["prefill_mode_declared"] is True
+
+
+def test_benchmark_can_pin_the_required_prefill_mode(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    _provenanced_predictions(predictions, _ROWS, [_provenance(), _provenance()])
+    labels = tmp_path / "labels.csv"
+    _labels_csv(labels, [("s1", "diestrus"), ("s2", "estrus")])
+
+    with pytest.raises(ValueError, match="requires 'off'"):
+        benchmark_predictions(
+            predictions, labels, tmp_path / "report", require_prefill_mode="off"
+        )
+
+    report = benchmark_predictions(
+        predictions, labels, tmp_path / "report", require_prefill_mode="on"
+    )
+    assert report["run_configuration"]["prompt_prefix_reuse"] == "on"
+
+
+def test_benchmark_flags_predictions_that_never_declared_a_prefill_mode(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "sample_id": sample,
+                    "image_prediction": {"primary_stage": stage, "probabilities": probabilities},
+                }
+            )
+            + "\n"
+            for sample, stage, probabilities in _ROWS
+        ),
+        encoding="utf-8",
+    )
+    labels = tmp_path / "labels.csv"
+    _labels_csv(labels, [("s1", "diestrus"), ("s2", "estrus")])
+
+    report = benchmark_predictions(predictions, labels, tmp_path / "report")
+
+    assert report["run_configuration"]["prompt_prefix_reuse"] == "unspecified"
+    assert report["gates"]["prefill_mode_declared"] is False
+
+    with pytest.raises(ValueError, match="requires 'on'"):
+        benchmark_predictions(
+            predictions, labels, tmp_path / "report", require_prefill_mode="on"
+        )

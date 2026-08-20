@@ -66,8 +66,14 @@
   8,843 tokens and ~16 s of the remaining 21 s. Halving the quadrant edge would cut that roughly
   fourfold. Whether that loses the nuclear detail separating clear from ghost nuclei is an empirical
   question; run it as an ablation rather than assuming either way.
-- [ ] Fix the prefill mode for all scored runs and state it in the frozen configuration. Prefix reuse
-  is self-consistent but not bit-identical to cold prefill, so a bakeoff must not mix the two.
+- [x] Fix the prefill mode for all scored runs and state it in the frozen configuration. The
+  benchmark now reads `provenance` from every prediction row and reduces it to one frozen
+  configuration (`RUN_IDENTITY_FIELDS`). A file whose rows disagree on any of those fields is
+  refused, and a prediction/baseline comparison is refused unless both sides match on
+  `COMPARISON_INVARIANTS` — prompt version, prefill mode, view-pack version, schema version.
+  Model identity is deliberately excluded so a bakeoff can still compare two models. Scored runs
+  pin the mode with `--require-prefill-mode {on,off}`; the report records `run_configuration` and
+  a `prefill_mode_declared` gate that is false when predictions never declared one.
 
 ## P1 — select and train
 
