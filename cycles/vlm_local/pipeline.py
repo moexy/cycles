@@ -32,11 +32,13 @@ class LocalVLMPipeline:
         prompt_version: str = PROMPT_VERSION,
         software_lock_hash: str = "unlocked",
         calibrator: TemperatureCalibrator | None = None,
+        quadrant_max_edge: int | None = 768,
     ) -> None:
         self.backend = backend
         self.prompt_version = prompt_version
         self.software_lock_hash = software_lock_hash
         self.calibrator = calibrator or TemperatureCalibrator()
+        self.quadrant_max_edge = quadrant_max_edge
 
     def classify_image(
         self,
@@ -47,7 +49,7 @@ class LocalVLMPipeline:
         day: float | None = None,
     ) -> LocalVLMRecord:
         path = Path(image_path).expanduser().resolve()
-        views = build_view_pack(path)
+        views = build_view_pack(path, quadrant_max_edge=self.quadrant_max_edge)
         images = [view.image for view in views]
         morphology = self._request(
             images,

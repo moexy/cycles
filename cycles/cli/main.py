@@ -382,6 +382,7 @@ def _build_local_vlm_pipeline(
     model_revision: str,
     calibrator_path: Path | None,
     reuse_prompt_prefix: bool = True,
+    quadrant_max_edge: int | None = 768,
 ) -> Any:
     from cycles.vlm_local.backend import MLXVLMBackend
     from cycles.vlm_local.calibration import TemperatureCalibrator
@@ -398,6 +399,7 @@ def _build_local_vlm_pipeline(
         backend,
         software_lock_hash=_software_lock_hash(),
         calibrator=calibrator,
+        quadrant_max_edge=quadrant_max_edge,
     )
 
 
@@ -692,6 +694,7 @@ def _cmd_vlm_local(args: argparse.Namespace) -> int:
         args.model_revision,
         args.calibrator,
         reuse_prompt_prefix=not args.no_prompt_prefix_reuse,
+        quadrant_max_edge=getattr(args, "quadrant_max_edge", 768),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if not args.resume or not args.output.is_file():
@@ -776,8 +779,8 @@ def _cmd_stage(args: argparse.Namespace) -> int:
             if len(stages) >= 2:
                 _write_cycle_plot(generate_cycle_plot_data(timestamps, stages), args.plot)
                 fit = fit_cyclicity(timestamps, stages, mouse_id="Subject")
-                reg = fit.get("regularity_score", 0.0)
-                length = fit.get("cycle_length_days", 0.0)
+                reg = getattr(fit, "regularity_score", 0.0)
+                length = getattr(fit, "estimated_cycle_length_days", 0.0)
                 print(
                     f"Longitudinal cyclicity: Regularity={reg:.2f}, "
                     f"Mean Period={length:.1f}d"
@@ -966,7 +969,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stage.add_argument("--save-overlays", type=Path, help="Directory to save cell overlays")
     stage.add_argument("--save-heatmaps", type=Path, help="Directory to save MIL attention heatmaps")
-    stage.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
+    stage.add_argument(
+        "--quadrant-max-edge",
+        type=int,
+        default=768,
+        help="Max edge size for quadrant view crops to balance latency and detail (default: 768)",
+    )
     stage.set_defaults(func=_cmd_stage)
 
     classify = subparsers.add_parser("classify", help="Run classical CNN staging")
@@ -1045,6 +1053,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--resume",
         action="store_true",
         help="Resume interrupted inference by skipping images already recorded in --output",
+    )
+    vlm_local.add_argument(
+        "--quadrant-max-edge",
+        type=int,
+        default=768,
+        help="Max edge size for quadrant view crops (default: 768)",
     )
     vlm_local.set_defaults(func=_cmd_vlm_local)
 

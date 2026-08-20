@@ -121,7 +121,7 @@ def test_vlm_local_writes_jsonl_and_applies_sequence_manifest(tmp_path: Path, mo
 
     assert status == 0
     builder.assert_called_once_with(
-        "test/model", None, REVISION, calibrator, reuse_prompt_prefix=True
+        "test/model", None, REVISION, calibrator, reuse_prompt_prefix=True, quadrant_max_edge=768
     )
     pipeline.classify_image.assert_called_once_with(image.resolve(), sample_id="s1", subject_id="mouse-1", day=4.0)
     reconciler.reconcile.assert_called_once_with([record])
