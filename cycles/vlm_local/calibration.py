@@ -50,6 +50,8 @@ class TemperatureCalibrator:
         if set(scores) != set(stages):
             raise ValueError("scores must contain exactly the four canonical stages")
         scaled = {stage: float(scores[stage]) / self.temperature for stage in stages}
+        if any(not math.isfinite(value) for value in scaled.values()):
+            raise ValueError("scores must be finite")
         maximum = max(scaled.values())
         exponentials = {stage: math.exp(value - maximum) for stage, value in scaled.items()}
         total = sum(exponentials.values())

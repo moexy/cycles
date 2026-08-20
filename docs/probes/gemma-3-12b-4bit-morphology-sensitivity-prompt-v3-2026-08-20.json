@@ -1,0 +1,225 @@
+{
+  "cases": [
+    {
+      "case_id": "textbook_estrus",
+      "derived_prediction": {
+        "confidence_tier": "high",
+        "primary_stage": "estrus",
+        "probabilities": {
+          "diestrus": 0.00012336413105694437,
+          "estrus": 0.9996299076068291,
+          "metestrus": 0.00012336413105694437,
+          "proestrus": 0.00012336413105694437
+        },
+        "rationale": "The morphology report indicates dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells present. This aligns directly with the criteria for estrus, where anucleate cornified squames dominate.",
+        "raw_scores": {
+          "diestrus": 1.0,
+          "estrus": 10.0,
+          "metestrus": 1.0,
+          "proestrus": 1.0
+        },
+        "secondary_stage": "diestrus"
+      },
+      "elapsed_seconds": 11.008952,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_match": true,
+      "expected_stage": "estrus",
+      "morphology": {
+        "arrangement": "sheets",
+        "artifacts": [],
+        "cornified_squames": "dominant",
+        "evidence": [
+          "Dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells."
+        ],
+        "leukocytes": "absent",
+        "nuclear_state": "anucleate",
+        "nucleated_epithelial": "absent",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_success": true,
+      "parsed_stage_evidence": {
+        "rationale": "The morphology report indicates dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells present. This aligns directly with the criteria for estrus, where anucleate cornified squames dominate.",
+        "raw_scores": {
+          "diestrus": 1.0,
+          "estrus": 10.0,
+          "metestrus": 1.0,
+          "proestrus": 1.0
+        }
+      },
+      "prompt": "Score the same slide against these explicit rodent vaginal cytology criteria:\n- diestrus: leukocytes dominate; epithelial cells are sparse and cornified squames are few or absent\n- proestrus: nucleated epithelial cells dominate; leukocytes are few or absent and cornification is low\n- estrus: anucleate cornified squames dominate, often in sheets; leukocytes and nucleated epithelial cells are few or absent\n- metestrus: a transitional mixture of cornified squames, nucleated epithelial cells, and leukocytes; cornification alone is not metestrus\nUse the stage-blind morphology below as the primary evidence summary and the images only to check it.\nDo not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"sheets\", \"artifacts\": [], \"cornified_squames\": \"dominant\", \"evidence\": [\"Dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells.\"], \"leukocytes\": \"absent\", \"nuclear_state\": \"anucleate\", \"nucleated_epithelial\": \"absent\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and finite relative evidence scores as values; these are not probabilities\n- rationale: one concise evidence-bound paragraph\nDo not calculate probabilities, choose a stage label, or report confidence; those fields are derived\ndeterministically from raw_scores. Slide-level unreadability was already recorded by the morphology pass.",
+      "raw_response": "```json\n{\n  \"raw_scores\": {\n    \"diestrus\": 1,\n    \"proestrus\": 1,\n    \"estrus\": 10,\n    \"metestrus\": 1\n  },\n  \"rationale\": \"The morphology report indicates dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells present. This aligns directly with the criteria for estrus, where anucleate cornified squames dominate.\"\n}\n```"
+    },
+    {
+      "case_id": "textbook_diestrus",
+      "derived_prediction": {
+        "confidence_tier": "high",
+        "primary_stage": "diestrus",
+        "probabilities": {
+          "diestrus": 0.9996299076068291,
+          "estrus": 0.00012336413105694437,
+          "metestrus": 0.00012336413105694437,
+          "proestrus": 0.00012336413105694437
+        },
+        "rationale": "The morphology report indicates that leukocytes are dominant, with rare nucleated epithelial cells and absent cornified squames. This aligns directly with the criteria for diestrus, where leukocytes dominate and epithelial cells and cornified squames are sparse or absent.",
+        "raw_scores": {
+          "diestrus": 10.0,
+          "estrus": 1.0,
+          "metestrus": 1.0,
+          "proestrus": 1.0
+        },
+        "secondary_stage": "proestrus"
+      },
+      "elapsed_seconds": 12.074269,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_match": true,
+      "expected_stage": "diestrus",
+      "morphology": {
+        "arrangement": "isolated",
+        "artifacts": [],
+        "cornified_squames": "absent",
+        "evidence": [
+          "Overwhelmingly leukocytes, with rare nucleated epithelial cells and no cornified squames."
+        ],
+        "leukocytes": "dominant",
+        "nuclear_state": "clear_nuclei",
+        "nucleated_epithelial": "rare",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_success": true,
+      "parsed_stage_evidence": {
+        "rationale": "The morphology report indicates that leukocytes are dominant, with rare nucleated epithelial cells and absent cornified squames. This aligns directly with the criteria for diestrus, where leukocytes dominate and epithelial cells and cornified squames are sparse or absent.",
+        "raw_scores": {
+          "diestrus": 10.0,
+          "estrus": 1.0,
+          "metestrus": 1.0,
+          "proestrus": 1.0
+        }
+      },
+      "prompt": "Score the same slide against these explicit rodent vaginal cytology criteria:\n- diestrus: leukocytes dominate; epithelial cells are sparse and cornified squames are few or absent\n- proestrus: nucleated epithelial cells dominate; leukocytes are few or absent and cornification is low\n- estrus: anucleate cornified squames dominate, often in sheets; leukocytes and nucleated epithelial cells are few or absent\n- metestrus: a transitional mixture of cornified squames, nucleated epithelial cells, and leukocytes; cornification alone is not metestrus\nUse the stage-blind morphology below as the primary evidence summary and the images only to check it.\nDo not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"isolated\", \"artifacts\": [], \"cornified_squames\": \"absent\", \"evidence\": [\"Overwhelmingly leukocytes, with rare nucleated epithelial cells and no cornified squames.\"], \"leukocytes\": \"dominant\", \"nuclear_state\": \"clear_nuclei\", \"nucleated_epithelial\": \"rare\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and finite relative evidence scores as values; these are not probabilities\n- rationale: one concise evidence-bound paragraph\nDo not calculate probabilities, choose a stage label, or report confidence; those fields are derived\ndeterministically from raw_scores. Slide-level unreadability was already recorded by the morphology pass.",
+      "raw_response": "```json\n{\n  \"raw_scores\": {\n    \"diestrus\": 10,\n    \"proestrus\": 1,\n    \"estrus\": 1,\n    \"metestrus\": 1\n  },\n  \"rationale\": \"The morphology report indicates that leukocytes are dominant, with rare nucleated epithelial cells and absent cornified squames. This aligns directly with the criteria for diestrus, where leukocytes dominate and epithelial cells and cornified squames are sparse or absent.\"\n}\n```"
+    },
+    {
+      "case_id": "textbook_proestrus",
+      "derived_prediction": {
+        "confidence_tier": "high",
+        "primary_stage": "proestrus",
+        "probabilities": {
+          "diestrus": 0.00012336413105694437,
+          "estrus": 0.00012336413105694437,
+          "metestrus": 0.00012336413105694437,
+          "proestrus": 0.9996299076068291
+        },
+        "rationale": "The morphology report indicates that nucleated epithelial cells are dominant, with clear nuclei, and leukocytes are absent. This aligns with the criteria for proestrus, where nucleated epithelial cells dominate and leukocytes are few or absent.",
+        "raw_scores": {
+          "diestrus": 1.0,
+          "estrus": 1.0,
+          "metestrus": 1.0,
+          "proestrus": 10.0
+        },
+        "secondary_stage": "diestrus"
+      },
+      "elapsed_seconds": 12.638672,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_match": true,
+      "expected_stage": "proestrus",
+      "morphology": {
+        "arrangement": "clusters",
+        "artifacts": [],
+        "cornified_squames": "rare",
+        "evidence": [
+          "Uniform clusters of round nucleated epithelial cells with clear nuclei and almost no leukocytes."
+        ],
+        "leukocytes": "absent",
+        "nuclear_state": "clear_nuclei",
+        "nucleated_epithelial": "dominant",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_success": true,
+      "parsed_stage_evidence": {
+        "rationale": "The morphology report indicates that nucleated epithelial cells are dominant, with clear nuclei, and leukocytes are absent. This aligns with the criteria for proestrus, where nucleated epithelial cells dominate and leukocytes are few or absent.",
+        "raw_scores": {
+          "diestrus": 1.0,
+          "estrus": 1.0,
+          "metestrus": 1.0,
+          "proestrus": 10.0
+        }
+      },
+      "prompt": "Score the same slide against these explicit rodent vaginal cytology criteria:\n- diestrus: leukocytes dominate; epithelial cells are sparse and cornified squames are few or absent\n- proestrus: nucleated epithelial cells dominate; leukocytes are few or absent and cornification is low\n- estrus: anucleate cornified squames dominate, often in sheets; leukocytes and nucleated epithelial cells are few or absent\n- metestrus: a transitional mixture of cornified squames, nucleated epithelial cells, and leukocytes; cornification alone is not metestrus\nUse the stage-blind morphology below as the primary evidence summary and the images only to check it.\nDo not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"clusters\", \"artifacts\": [], \"cornified_squames\": \"rare\", \"evidence\": [\"Uniform clusters of round nucleated epithelial cells with clear nuclei and almost no leukocytes.\"], \"leukocytes\": \"absent\", \"nuclear_state\": \"clear_nuclei\", \"nucleated_epithelial\": \"dominant\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and finite relative evidence scores as values; these are not probabilities\n- rationale: one concise evidence-bound paragraph\nDo not calculate probabilities, choose a stage label, or report confidence; those fields are derived\ndeterministically from raw_scores. Slide-level unreadability was already recorded by the morphology pass.",
+      "raw_response": "```json\n{\n  \"raw_scores\": {\n    \"diestrus\": 1,\n    \"proestrus\": 10,\n    \"estrus\": 1,\n    \"metestrus\": 1\n  },\n  \"rationale\": \"The morphology report indicates that nucleated epithelial cells are dominant, with clear nuclei, and leukocytes are absent. This aligns with the criteria for proestrus, where nucleated epithelial cells dominate and leukocytes are few or absent.\"\n}\n```"
+    },
+    {
+      "case_id": "textbook_metestrus",
+      "derived_prediction": {
+        "confidence_tier": "high",
+        "primary_stage": "metestrus",
+        "probabilities": {
+          "diestrus": 0.017361668724161467,
+          "estrus": 0.017361668724161467,
+          "metestrus": 0.9479149938275157,
+          "proestrus": 0.017361668724161467
+        },
+        "rationale": "The evidence indicates a mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes, which aligns with the criteria for metestrus, where a transitional mixture of cell types is observed. While cornified squames, nucleated epithelial cells, and leukocytes are present, the absence of a dominant cell type excludes diestrus, proestrus, and estrus.",
+        "raw_scores": {
+          "diestrus": 1.0,
+          "estrus": 1.0,
+          "metestrus": 5.0,
+          "proestrus": 1.0
+        },
+        "secondary_stage": "diestrus"
+      },
+      "elapsed_seconds": 13.47177,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_match": true,
+      "expected_stage": "metestrus",
+      "morphology": {
+        "arrangement": "mixed",
+        "artifacts": [],
+        "cornified_squames": "present",
+        "evidence": [
+          "A mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes."
+        ],
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "nucleated_epithelial": "present",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_success": true,
+      "parsed_stage_evidence": {
+        "rationale": "The evidence indicates a mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes, which aligns with the criteria for metestrus, where a transitional mixture of cell types is observed. While cornified squames, nucleated epithelial cells, and leukocytes are present, the absence of a dominant cell type excludes diestrus, proestrus, and estrus.",
+        "raw_scores": {
+          "diestrus": 1.0,
+          "estrus": 1.0,
+          "metestrus": 5.0,
+          "proestrus": 1.0
+        }
+      },
+      "prompt": "Score the same slide against these explicit rodent vaginal cytology criteria:\n- diestrus: leukocytes dominate; epithelial cells are sparse and cornified squames are few or absent\n- proestrus: nucleated epithelial cells dominate; leukocytes are few or absent and cornification is low\n- estrus: anucleate cornified squames dominate, often in sheets; leukocytes and nucleated epithelial cells are few or absent\n- metestrus: a transitional mixture of cornified squames, nucleated epithelial cells, and leukocytes; cornification alone is not metestrus\nUse the stage-blind morphology below as the primary evidence summary and the images only to check it.\nDo not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"mixed\", \"artifacts\": [], \"cornified_squames\": \"present\", \"evidence\": [\"A mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes.\"], \"leukocytes\": \"present\", \"nuclear_state\": \"mixed\", \"nucleated_epithelial\": \"present\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and finite relative evidence scores as values; these are not probabilities\n- rationale: one concise evidence-bound paragraph\nDo not calculate probabilities, choose a stage label, or report confidence; those fields are derived\ndeterministically from raw_scores. Slide-level unreadability was already recorded by the morphology pass.",
+      "raw_response": "```json\n{\n  \"raw_scores\": {\n    \"diestrus\": 1,\n    \"proestrus\": 1,\n    \"estrus\": 1,\n    \"metestrus\": 5\n  },\n  \"rationale\": \"The evidence indicates a mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes, which aligns with the criteria for metestrus, where a transitional mixture of cell types is observed. While cornified squames, nucleated epithelial cells, and leukocytes are present, the absence of a dominant cell type excludes diestrus, proestrus, and estrus.\"\n}\n```"
+    }
+  ],
+  "disclaimer": "Expected stages are textbook design expectations, not independently annotated ground truth. The fixed source image can conflict with the counterfactual morphology; exact matches measure prompt sensitivity, not biological accuracy.",
+  "model": {
+    "adapter_hash": "none",
+    "model_id": "mlx-community/gemma-3-12b-it-4bit",
+    "model_revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558",
+    "prompt_prefix_reuse": "on"
+  },
+  "probe_type": "counterfactual_morphology_sensitivity",
+  "prompt_version": "morphology-first-v3",
+  "quadrant_max_edge": null,
+  "schema_version": "1.0",
+  "score_interpretation": "Model-authored relative evidence scores, not internal logits; identity-temperature softmax is an engineering default, not a validated calibration result.",
+  "source_image": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+  "source_image_role": "fixed visual context; not probe ground truth",
+  "source_image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271",
+  "summary": {
+    "cases": 4,
+    "design_expectation_matches": 4,
+    "parsed": 4
+  },
+  "view_pack_version": "overview-quadrants-v1"
+}

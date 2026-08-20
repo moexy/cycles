@@ -4,8 +4,9 @@
 **Branch:** `feature/estrous-mlx-v3`
 **Isolated worktree:** `/private/tmp/cycles-estrous-mlx-v3`
 **Source checkout:** `/Volumes/SSD/code/cycles` (still at `505e8b1`; this branch is not merged)
-**Status:** the local VLM path now runs on real weights and is fast enough to use. No scientific
-result exists yet, and one finding below calls the planned bakeoff into question.
+**Status:** the local VLM path runs on real weights and the morphology-to-stage contract now passes
+all controlled sensitivity cases on all three candidates. This is an engineering result, not a
+scientific accuracy result; no independently labeled evaluation exists yet.
 
 ---
 
@@ -13,7 +14,7 @@ result exists yet, and one finding below calls the planned bakeoff into question
 
 ```text
 env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev   # in sync
-.venv/bin/python -m pytest -q        142 passed
+.venv/bin/python -m pytest -q        173 passed
 .venv/bin/python -m ruff check .     All checks passed!
 mlx 0.32.1  |  mlx-vlm 0.6.15  |  mx.default_device() -> Device(gpu, 0)
 ```
@@ -24,6 +25,9 @@ inference has now run end to end.
 ### Commits on this branch
 
 ```text
+c435290 and later entries below are historical commits; see `git log main..HEAD` for the live list.
+d7ae396  docs: add CLAUDE.md recording the Markdown-first and local-first conventions
+ac72ab6  docs: rewrite the v3 handoff as a comprehensive session record
 c435290  docs: raise zero-shot staging capability as a blocker ahead of the bakeoff
 3cf106b  feat(views): add quadrant_max_edge and record the zero-shot staging ablation
 7b26154  docs: record the latency diagnosis and the remaining view-pack tradeoff
@@ -105,10 +109,15 @@ inference        ~21 s / image
 
 ---
 
-## 4. The blocking finding: zero-shot staging does not work
+## 4. Controlled staging probe: the blocker was the contract, not model size
 
-Pass 2 was given four textbook-unambiguous synthetic morphologies. It scored **0/4 at high
-confidence**:
+The prior handoff described four counterfactual morphologies as a **0/4 zero-shot accuracy result**.
+That phrasing was wrong. The fixed training image is not ground truth for the supplied morphology,
+and the expected stages are textbook design expectations rather than independent annotations. The
+probe measures whether pass 2 responds coherently to controlled morphology, not biological accuracy.
+
+The underlying failure was still real. Under `morphology-first-v2`, Qwen3-VL 4B matched 0/4 design
+expectations and produced only 3/4 schema-valid responses:
 
 | morphology supplied | correct stage | returned |
 |---|---|---|
@@ -117,20 +126,35 @@ confidence**:
 | clustered nucleated epithelial, clear nuclei | proestrus | **estrus** (0.8) |
 | cornified + nucleated + abundant leukocytes | metestrus | **estrus** (0.7) |
 
-This is **not** an artifact of the `morphology-first-v2` prompt written this session. Under the
-original v1 prompt the same four cases return a constant `metestrus`, insensitive to the evidence
-entirely. Both fail; v2 at least responds to its input.
+Two design flaws explained the result:
 
-On real slides the same degeneracy shows: `estrus / low` for all 24 images in the ablation, while the
+1. The stage prompt named the four labels but never defined their cytologic criteria. The models
+   repeatedly inverted estrus/metestrus and leukocyte-dominant diestrus.
+2. The model was asked to emit raw scores, probabilities, primary/secondary labels, and confidence.
+   Those are redundant arithmetic/consistency tasks. Across the first three candidate probes, only
+   7/12 outputs passed strict schema validation.
+
+`morphology-first-v3` now provides the explicit criteria and asks the model only for four finite
+relative evidence scores plus a rationale. The pipeline derives probabilities, rank, and confidence
+deterministically. Raw scores are model-authored evidence values, **not internal logits**; identity-
+temperature softmax is an engineering default, not validated calibration.
+
+All three immutable candidate revisions then passed the controlled probe:
+
+| candidate | revision | v2 valid / match | v3 valid / match | v3 total generation time |
+|---|---|---:|---:|---:|
+| Qwen3-VL 4B 8-bit | `0943db6e…` | 3/4 / 0/4 | **4/4 / 4/4** | 28.6 s |
+| Qwen3-VL 8B 4-bit | `defcdea7…` | 2/4 / 0/4 | **4/4 / 4/4** | 41.8 s |
+| Gemma 3 12B 4-bit | `86cc6a8d…` | 2/4 / 0/4 | **4/4 / 4/4** | 49.2 s |
+
+Raw prompts, responses, parses, hashes, revisions, and timings are under `docs/probes/`. The first
+call includes cold view prefill and later calls reuse the shared image prefix, so totals are useful
+within this probe but are not a general throughput benchmark.
+
+On real slides under v2 the same degeneracy showed: `estrus / low` for all 24 images in the ablation, while the
 morphology pass varied normally (`cornified_squames` 11 present / 13 absent). Pass 1 discriminates.
-Pass 2 ignores it.
-
-**Consequence for the plan.** The P1 "accuracy-first zero-shot bakeoff" assumes the candidates can
-stage zero-shot. If the 8B and 12B candidates behave like the 4B, that comparison measures noise and
-the adapter is doing all the work. Run the four synthetic cases against Qwen3-VL 8B 4-bit and
-Gemma 3 12B 4-bit before spending the full bakeoff — four calls per model.
-
-**Scope:** one model, the smallest candidate. This licenses no conclusion about the other two.
+That real-image ablation has not been rerun under v3 and has no independent labels. It cannot establish
+accuracy or model selection. The bakeoff remains meaningful only after a clean teacher reference exists.
 
 ---
 
@@ -178,10 +202,39 @@ morphology schema does not capture. Worth an ablation once labels exist.
 
 ---
 
-## 7. Contamination ledger
+## 7. Later audit hardening
 
-The annotation protocol requires a genuinely stage-blind teacher pass. Recording precisely what this
-session was exposed to, so the next annotator can judge for themselves:
+A later review reproduced and fixed additional paths that could silently corrupt evidence:
+
+- A valid morphology record was discarded when stage JSON failed twice; stage failure now leaves
+  morphology intact and marks only the stage prediction ungradable.
+- Repair calls were stateless but referred to a "previously requested schema" that the model could
+  not see; the full original request is now included.
+- Ungradable records could be written but not read back; schema round-trip now supports the explicit
+  no-stage/no-score representation.
+- NaN/infinite scores, non-unit probabilities, duplicate IDs, and partial benchmark coverage could
+  reach metrics or be silently normalized/overwritten; all are now rejected.
+- Prompt-cache identity omitted image dimensions and mode; equal bytes in differently shaped images
+  can no longer reuse the wrong KV state.
+- Model provenance defaulted to `unspecified` and the lock hash depended on launch directory.
+  `--model-revision` now requires an immutable 40-character commit SHA, and `uv.lock` is resolved
+  relative to the installed repository source.
+- Annotation corrections and reloaded events were under-validated, and changing a primary stage to
+  the old secondary could export identical primary/secondary labels. Events are revalidated and a
+  duplicate runner-up is cleared.
+- Sanitized teacher sample IDs could overwrite image files. Safe filename collisions now fail and
+  roll back the prepared dataset.
+
+These are engineering validations. They do not substitute for an independent teacher reference.
+
+## 8. Contamination ledger
+
+The annotation protocol requires a genuinely stage-blind teacher pass. The historical claims below
+were true only of the branch-building session. A later audit session read aggregate information from
+`ground_truth_metadata.csv` and enumerated held-out paths while checking repository state. No held-out
+image was rendered or passed to a model, but this context is contaminated for fresh annotation.
+
+Historical branch-building session:
 
 - **Never read:** any stage label, `manifest.csv`, `summary.json`, or any legacy stage metadata.
 - **Never opened:** the `test` or `validate` partitions.
@@ -194,37 +247,35 @@ session was exposed to, so the next annotator can judge for themselves:
 - **Seen:** model *predictions* on ~30 training images — all degenerate `estrus`, carrying no label
   information.
 
-This session is therefore not disqualifying for stage-blind annotation on label grounds, but it has
-seen subject/day ordering for part of the corpus. **The safe course remains a fresh restricted
-context**, as the plan already requires.
+The current audit session **must not perform teacher annotation**. Start a fresh restricted context
+with no metadata or held-out access, as the plan already requires.
 
 ---
 
-## 8. Remaining work
+## 9. Remaining work
 
 See [`TODO_MLX_V3.md`](TODO_MLX_V3.md) for the full list. Ordered by what blocks what:
 
-1. **Check zero-shot staging capability on the 8B and 12B candidates** (§4). Cheap, and it decides
-   whether the bakeoff as designed is worth running at all.
-2. **Fresh, stage-blind teacher annotation** in a restricted context with access only to
+1. **Fresh, stage-blind teacher annotation** in a restricted context with access only to
    `/Volumes/SSD/Imaging/Cycles/dataset_split/train`. Freeze a SHA-256 inventory of the 343 images,
    complete the image-only pass, hash the log, and only then expose subject/day ordering for the 141
    longitudinal images. Nothing downstream is valid without this.
-3. **Smoke-test the two remaining candidates** on Metal and confirm peak allocation stays under
-   36 GiB at the larger sizes.
-4. Then: bakeoff -> broad SFT adapter -> replay-ratio domain adaptation -> freeze -> single held-out
+2. **Rerun a small labeled, non-held-out real-image comparison under prompt v3** before a full
+   bakeoff. The controlled probe proves contract compliance only.
+3. **Measure peak allocation** for the 8B and 12B candidates and confirm it stays under 36 GiB.
+4. Then: bakeoff -> decide whether SFT is warranted -> replay-ratio domain adaptation if warranted -> freeze -> single held-out
    open, with all gates from the plan.
 
 Fix the prefill mode across every scored run and state it in the frozen configuration.
 
 ---
 
-## 9. Resume
+## 10. Resume
 
 ```bash
 cd /private/tmp/cycles-estrous-mlx-v3
 env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev
-.venv/bin/python -m pytest -q          # expect 142 passed
+.venv/bin/python -m pytest -q
 .venv/bin/python -m ruff check .
 ```
 
@@ -234,6 +285,7 @@ Single-image inference (non-held-out only):
 .venv/bin/cycles vlm-local \
   --input /Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp \
   --model mlx-community/Qwen3-VL-4B-Instruct-8bit \
+  --model-revision 0943db6e15185b86be368d3cf0704aec740b142b \
   --output /tmp/cycles-mlx-smoke.jsonl
 # add --no-prompt-prefix-reuse to force cold prefill
 ```

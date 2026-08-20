@@ -5,9 +5,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from PIL import Image
 
 import cycles.cli.main as cli
+
+REVISION = "a" * 40
 
 
 def test_parser_recognizes_local_vlm_commands(tmp_path: Path) -> None:
@@ -21,7 +24,7 @@ def test_parser_recognizes_local_vlm_commands(tmp_path: Path) -> None:
     baseline.write_text("{}\n")
 
     parsed = [
-        cli.build_parser().parse_args(["vlm-local", "--input", str(image), "--model", "test/model", "--output", str(tmp_path / "out.jsonl")]),
+        cli.build_parser().parse_args(["vlm-local", "--input", str(image), "--model", "test/model", "--model-revision", REVISION, "--output", str(tmp_path / "out.jsonl")]),
         cli.build_parser().parse_args(["vlm-prepare-sft", "--source", "blind-teacher", "--input", str(predictions), "--output", str(tmp_path / "sft")]),
         cli.build_parser().parse_args(["vlm-benchmark", "--predictions", str(predictions), "--baseline-predictions", str(baseline), "--labels", str(labels), "--output", str(tmp_path / "report")]),
     ]
@@ -50,11 +53,11 @@ def test_vlm_local_writes_jsonl_and_applies_sequence_manifest(tmp_path: Path, mo
     reconciler.reconcile.return_value = [record]
     monkeypatch.setattr(cli, "_build_temporal_reconciler", MagicMock(return_value=reconciler))
 
-    status = cli.main(["vlm-local", "--input", str(image), "--model", "test/model", "--output", str(output), "--sequence-manifest", str(manifest), "--calibrator", str(calibrator)])
+    status = cli.main(["vlm-local", "--input", str(image), "--model", "test/model", "--model-revision", REVISION, "--output", str(output), "--sequence-manifest", str(manifest), "--calibrator", str(calibrator)])
 
     assert status == 0
     builder.assert_called_once_with(
-        "test/model", None, "unspecified", calibrator, reuse_prompt_prefix=True
+        "test/model", None, REVISION, calibrator, reuse_prompt_prefix=True
     )
     pipeline.classify_image.assert_called_once_with(image.resolve(), sample_id="s1", subject_id="mouse-1", day=4.0)
     reconciler.reconcile.assert_called_once_with([record])
@@ -79,6 +82,7 @@ def test_vlm_local_can_disable_prompt_prefix_reuse(monkeypatch, tmp_path: Path) 
             "vlm-local",
             "--input", str(image),
             "--model", "test/model",
+            "--model-revision", REVISION,
             "--output", str(output),
             "--no-prompt-prefix-reuse",
         ]
@@ -86,3 +90,28 @@ def test_vlm_local_can_disable_prompt_prefix_reuse(monkeypatch, tmp_path: Path) 
 
     assert status == 0
     assert builder.call_args.kwargs["reuse_prompt_prefix"] is False
+
+
+def test_vlm_local_requires_model_revision(tmp_path: Path) -> None:
+    image = tmp_path / "slide.png"
+    Image.new("RGB", (8, 8)).save(image)
+
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(
+            [
+                "vlm-local",
+                "--input", str(image),
+                "--model", "test/model",
+                "--output", str(tmp_path / "out.jsonl"),
+            ]
+        )
+
+
+def test_software_lock_hash_does_not_depend_on_working_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    expected = cli._software_lock_hash()
+    monkeypatch.chdir(tmp_path)
+
+    assert cli._software_lock_hash() == expected
+    assert expected != "unlocked"

@@ -50,6 +50,24 @@ class ConfidenceTier(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class StageEvidence:
+    """Minimal model-authored stage evidence; derived fields stay deterministic."""
+
+    raw_scores: dict[EstrousStage, float]
+    rationale: str
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> StageEvidence:
+        rationale = payload.get("rationale")
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise ValueError("rationale must be a non-empty string")
+        return cls(
+            raw_scores=_stage_map(payload["raw_scores"], normalise=False),
+            rationale=rationale.strip(),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MorphologyObservation:
     cornified_squames: Abundance
     nucleated_epithelial: Abundance
@@ -104,7 +122,21 @@ class ImagePrediction:
         primary = _optional_stage(payload.get("primary_stage"))
         secondary = _optional_stage(payload.get("secondary_stage"))
         if primary is None:
-            raise ValueError("primary_stage must be one of the four canonical stages")
+            if secondary is not None:
+                raise ValueError("ungradable prediction cannot have a secondary_stage")
+            if payload.get("raw_scores") != {} or payload.get("probabilities") != {}:
+                raise ValueError("ungradable prediction cannot have stage scores")
+            rationale = payload.get("rationale")
+            if not isinstance(rationale, str) or not rationale.strip():
+                raise ValueError("rationale must be a non-empty string")
+            return cls(
+                None,
+                None,
+                {},
+                {},
+                ConfidenceTier(payload["confidence_tier"]),
+                rationale.strip(),
+            )
         if secondary == primary:
             # A maximally confident model names the same stage twice, meaning
             # "no distinct runner-up". That is an answer, not malformed output;
@@ -217,14 +249,16 @@ def _stage_map(value: Any, *, normalise: bool) -> dict[EstrousStage, float]:
     if set(value) != {stage.value for stage in stages}:
         raise ValueError("stage scores must contain exactly the four canonical stages")
     parsed = {stage: float(value[stage.value]) for stage in stages}
+    if any(not math.isfinite(score) for score in parsed.values()):
+        raise ValueError("stage scores must be finite")
     if normalise:
         if any(score < 0 for score in parsed.values()):
             raise ValueError("probabilities cannot be negative")
         total = sum(parsed.values())
         if total <= 0:
             raise ValueError("probabilities must have positive mass")
-        if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-12):
-            parsed = {stage: score / total for stage, score in parsed.items()}
+        if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-6):
+            raise ValueError("probabilities must sum to 1")
     return parsed
 
 

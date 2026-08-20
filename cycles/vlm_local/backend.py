@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -25,11 +26,13 @@ class MLXVLMBackend:
         self,
         model_id: str,
         *,
+        model_revision: str,
         adapter_path: Path | str | None = None,
-        model_revision: str = "unspecified",
         max_tokens: int = 1024,
         reuse_prompt_prefix: bool = True,
     ) -> None:
+        if re.fullmatch(r"[0-9a-fA-F]{40}", model_revision) is None:
+            raise ValueError("model_revision must be a 40-character commit SHA")
         try:
             from mlx_vlm import apply_chat_template, generate, load
             from mlx_vlm.generate.common import PromptCacheState
@@ -45,8 +48,7 @@ class MLXVLMBackend:
         load_kwargs: dict[str, Any] = {}
         if self._adapter_path is not None:
             load_kwargs["adapter_path"] = str(self._adapter_path)
-        if model_revision != "unspecified":
-            load_kwargs["revision"] = model_revision
+        load_kwargs["revision"] = model_revision
         self._model, self._processor = load(model_id, **load_kwargs)
         self._max_tokens = max_tokens
         self._prompt_cache_state_factory = PromptCacheState
@@ -78,7 +80,7 @@ class MLXVLMBackend:
                 path = Path(temporary) / f"view-{index}.png"
                 image.save(path, format="PNG")
                 paths.append(str(path))
-                digests.append(hashlib.sha256(image.tobytes()).hexdigest())
+                digests.append(_image_hash(image))
             signature = tuple(digests)
             # generate() does not apply the chat template; without it the prompt
             # carries no image placeholder tokens and the vision embedding has
@@ -127,4 +129,17 @@ def _path_hash(path: Path) -> str:
             digest.update(child.read_bytes())
     else:
         raise FileNotFoundError(path)
+    return digest.hexdigest()
+
+
+def _image_hash(image: Image.Image) -> str:
+    """Hash every property that determines the materialized vision input."""
+    digest = hashlib.sha256()
+    digest.update(image.mode.encode())
+    digest.update(b"\0")
+    digest.update(str(image.size[0]).encode())
+    digest.update(b"x")
+    digest.update(str(image.size[1]).encode())
+    digest.update(b"\0")
+    digest.update(image.tobytes())
     return digest.hexdigest()

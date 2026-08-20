@@ -21,3 +21,11 @@
    record hash, then export a separate frozen training corpus deliberately.
 10. Relative improvement and subgroup safety are more defensible than arbitrary historical targets.
     Test data must remain sealed until prompts, adapters, calibration, and thresholds are frozen.
+11. A label list is not a domain contract. The first stage prompt named all four stages but omitted
+    their cytologic definitions; three different models then made the same systematic inversions.
+    Explicit stage criteria fixed the controlled sensitivity probe on every candidate.
+12. Do not delegate arithmetic and redundant consistency fields to a generative model. Request the
+    minimal evidence scores and rationale, then derive rank, probabilities, and confidence in code.
+    The returned scores are still self-reported evidence values, not internal logits.
+13. Counterfactual prompt probes are design diagnostics, not accuracy estimates. Their expected
+    outputs must be labeled as assumptions unless independently annotated ground truth exists.

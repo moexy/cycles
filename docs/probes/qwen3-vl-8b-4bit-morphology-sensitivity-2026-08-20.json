@@ -1,0 +1,152 @@
+{
+  "cases": [
+    {
+      "case_id": "textbook_estrus",
+      "elapsed_seconds": 34.68553,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_stage": "estrus",
+      "morphology": {
+        "arrangement": "sheets",
+        "artifacts": [],
+        "cornified_squames": "dominant",
+        "evidence": [
+          "Dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells."
+        ],
+        "leukocytes": "absent",
+        "nuclear_state": "anucleate",
+        "nucleated_epithelial": "absent",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_error": "ValueError: probabilities must have positive mass",
+      "parse_success": false,
+      "prompt": "Score the same slide against the four canonical stages: diestrus, proestrus, estrus, and metestrus.\nUse the images and the stage-blind morphology below. Do not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"sheets\", \"artifacts\": [], \"cornified_squames\": \"dominant\", \"evidence\": [\"Dense sheets of anucleate cornified squames, with no leukocytes or nucleated epithelial cells.\"], \"leukocytes\": \"absent\", \"nuclear_state\": \"anucleate\", \"nucleated_epithelial\": \"absent\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and unbounded numeric scores as values\n- probabilities: object with all four stage names as keys, each at least 0, together summing to 1\n- primary_stage: exactly one of diestrus|proestrus|estrus|metestrus, the stage with the highest probability\n- secondary_stage: the stage with the second-highest probability, or null if no runner-up is distinguishable\n- confidence_tier: low|medium|high\n- rationale: one concise evidence-bound paragraph\nNever answer \"unknown\", \"unclear\", or \"indeterminate\", and never return all-zero probabilities. Weak or\nconflicting evidence is reported by choosing the best-supported stage and setting confidence_tier to low;\nslide-level unreadability was already recorded by the preceding morphology pass.",
+      "raw_response": "{\n  \"raw_scores\": {\n    \"diestrus\": 0,\n    \"proestrus\": 0,\n    \"estrus\": 0,\n    \"metestrus\": 0\n  },\n  \"probabilities\": {\n    \"diestrus\": 0,\n    \"proestrus\": 0,\n    \"estrus\": 0,\n    \"metestrus\": 0\n  },\n  \"primary_stage\": \"diestrus\",\n  \"secondary_stage\": null,\n  \"confidence_tier\": \"low\",\n  \"rationale\": \"The slide shows dense sheets of anucleate cornified squames, with no evidence of nucleated epithelial cells or leukocytes. This morphology is characteristic of the diestrus stage, as it represents the post-ovulatory phase where cornified cells dominate the smear. While the evidence is consistent with diestrus, the absence of any other stage-specific features (like the presence of nucleated cells in proestrus/estrus or the cellular debris of metestrus) means the assignment is based on the most fitting description, with low confidence due to the lack of definitive stage-specific markers beyond the cornified squames.\"\n}"
+    },
+    {
+      "case_id": "textbook_diestrus",
+      "elapsed_seconds": 7.136156,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_match": false,
+      "expected_stage": "diestrus",
+      "morphology": {
+        "arrangement": "isolated",
+        "artifacts": [],
+        "cornified_squames": "absent",
+        "evidence": [
+          "Overwhelmingly leukocytes, with rare nucleated epithelial cells and no cornified squames."
+        ],
+        "leukocytes": "dominant",
+        "nuclear_state": "clear_nuclei",
+        "nucleated_epithelial": "rare",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_success": true,
+      "parsed_prediction": {
+        "confidence_tier": "medium",
+        "primary_stage": "estrus",
+        "probabilities": {
+          "diestrus": 0.1,
+          "estrus": 0.6,
+          "metestrus": 0.1,
+          "proestrus": 0.2
+        },
+        "rationale": "The slide shows a high density of leukocytes with rare nucleated epithelial cells, which is most consistent with the cellular profile of estrus. The absence of cornified squames and the overwhelming presence of leukocytes support this stage, though the evidence is not definitive enough to assign high confidence.",
+        "raw_scores": {
+          "diestrus": 0.1,
+          "estrus": 0.6,
+          "metestrus": 0.1,
+          "proestrus": 0.2
+        },
+        "secondary_stage": "proestrus"
+      },
+      "prompt": "Score the same slide against the four canonical stages: diestrus, proestrus, estrus, and metestrus.\nUse the images and the stage-blind morphology below. Do not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"isolated\", \"artifacts\": [], \"cornified_squames\": \"absent\", \"evidence\": [\"Overwhelmingly leukocytes, with rare nucleated epithelial cells and no cornified squames.\"], \"leukocytes\": \"dominant\", \"nuclear_state\": \"clear_nuclei\", \"nucleated_epithelial\": \"rare\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and unbounded numeric scores as values\n- probabilities: object with all four stage names as keys, each at least 0, together summing to 1\n- primary_stage: exactly one of diestrus|proestrus|estrus|metestrus, the stage with the highest probability\n- secondary_stage: the stage with the second-highest probability, or null if no runner-up is distinguishable\n- confidence_tier: low|medium|high\n- rationale: one concise evidence-bound paragraph\nNever answer \"unknown\", \"unclear\", or \"indeterminate\", and never return all-zero probabilities. Weak or\nconflicting evidence is reported by choosing the best-supported stage and setting confidence_tier to low;\nslide-level unreadability was already recorded by the preceding morphology pass.",
+      "raw_response": "{\n  \"raw_scores\": {\n    \"diestrus\": 0.1,\n    \"proestrus\": 0.2,\n    \"estrus\": 0.6,\n    \"metestrus\": 0.1\n  },\n  \"probabilities\": {\n    \"diestrus\": 0.1,\n    \"proestrus\": 0.2,\n    \"estrus\": 0.6,\n    \"metestrus\": 0.1\n  },\n  \"primary_stage\": \"estrus\",\n  \"secondary_stage\": \"proestrus\",\n  \"confidence_tier\": \"medium\",\n  \"rationale\": \"The slide shows a high density of leukocytes with rare nucleated epithelial cells, which is most consistent with the cellular profile of estrus. The absence of cornified squames and the overwhelming presence of leukocytes support this stage, though the evidence is not definitive enough to assign high confidence.\"\n}"
+    },
+    {
+      "case_id": "textbook_proestrus",
+      "elapsed_seconds": 7.073596,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_stage": "proestrus",
+      "morphology": {
+        "arrangement": "clusters",
+        "artifacts": [],
+        "cornified_squames": "rare",
+        "evidence": [
+          "Uniform clusters of round nucleated epithelial cells with clear nuclei and almost no leukocytes."
+        ],
+        "leukocytes": "absent",
+        "nuclear_state": "clear_nuclei",
+        "nucleated_epithelial": "dominant",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_error": "ValueError: probabilities must sum to 1",
+      "parse_success": false,
+      "prompt": "Score the same slide against the four canonical stages: diestrus, proestrus, estrus, and metestrus.\nUse the images and the stage-blind morphology below. Do not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"clusters\", \"artifacts\": [], \"cornified_squames\": \"rare\", \"evidence\": [\"Uniform clusters of round nucleated epithelial cells with clear nuclei and almost no leukocytes.\"], \"leukocytes\": \"absent\", \"nuclear_state\": \"clear_nuclei\", \"nucleated_epithelial\": \"dominant\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and unbounded numeric scores as values\n- probabilities: object with all four stage names as keys, each at least 0, together summing to 1\n- primary_stage: exactly one of diestrus|proestrus|estrus|metestrus, the stage with the highest probability\n- secondary_stage: the stage with the second-highest probability, or null if no runner-up is distinguishable\n- confidence_tier: low|medium|high\n- rationale: one concise evidence-bound paragraph\nNever answer \"unknown\", \"unclear\", or \"indeterminate\", and never return all-zero probabilities. Weak or\nconflicting evidence is reported by choosing the best-supported stage and setting confidence_tier to low;\nslide-level unreadability was already recorded by the preceding morphology pass.",
+      "raw_response": "{\n  \"raw_scores\": {\n    \"diestrus\": 2,\n    \"proestrus\": 1,\n    \"estrus\": 4,\n    \"metestrus\": 1\n  },\n  \"probabilities\": {\n    \"diestrus\": 0.1,\n    \"proestrus\": 0.05,\n    \"estrus\": 0.4,\n    \"metestrus\": 0.05\n  },\n  \"primary_stage\": \"estrus\",\n  \"secondary_stage\": \"diestrus\",\n  \"confidence_tier\": \"medium\",\n  \"rationale\": \"The slide shows uniform clusters of round nucleated epithelial cells with clear nuclei and almost no leukocytes, which is most consistent with the morphology of estrus. The absence of significant inflammatory cells or signs of regression supports this stage over others. The evidence is moderately strong, as the cellular arrangement is characteristic but not definitively diagnostic without additional context.\"\n}"
+    },
+    {
+      "case_id": "textbook_metestrus",
+      "elapsed_seconds": 9.282338,
+      "expectation_status": "design_expectation_not_ground_truth",
+      "expected_match": false,
+      "expected_stage": "metestrus",
+      "morphology": {
+        "arrangement": "mixed",
+        "artifacts": [],
+        "cornified_squames": "present",
+        "evidence": [
+          "A mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes."
+        ],
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "nucleated_epithelial": "present",
+        "qc_reasons": [],
+        "qc_status": "usable"
+      },
+      "parse_success": true,
+      "parsed_prediction": {
+        "confidence_tier": "medium",
+        "primary_stage": "estrus",
+        "probabilities": {
+          "diestrus": 0.1,
+          "estrus": 0.5,
+          "metestrus": 0.2,
+          "proestrus": 0.2
+        },
+        "rationale": "The slide shows a mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes, with a predominance of cells exhibiting features consistent with estrus, such as high cellular density and prominent nucleated cells. The presence of abundant leukocytes and a mixed nuclear state supports a stage of heightened cellular activity, most aligned with estrus. The evidence does not strongly support a specific earlier or later stage, so proestrus is assigned as the secondary stage with medium confidence.",
+        "raw_scores": {
+          "diestrus": 2.0,
+          "estrus": 4.0,
+          "metestrus": 1.0,
+          "proestrus": 3.0
+        },
+        "secondary_stage": "proestrus"
+      },
+      "prompt": "Score the same slide against the four canonical stages: diestrus, proestrus, estrus, and metestrus.\nUse the images and the stage-blind morphology below. Do not invent findings that are absent from the evidence.\nMorphology: {\"arrangement\": \"mixed\", \"artifacts\": [], \"cornified_squames\": \"present\", \"evidence\": [\"A mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes.\"], \"leukocytes\": \"present\", \"nuclear_state\": \"mixed\", \"nucleated_epithelial\": \"present\", \"qc_reasons\": [], \"qc_status\": \"usable\"}\nReturn JSON only, with these exact fields:\n- raw_scores: object with all four stage names as keys and unbounded numeric scores as values\n- probabilities: object with all four stage names as keys, each at least 0, together summing to 1\n- primary_stage: exactly one of diestrus|proestrus|estrus|metestrus, the stage with the highest probability\n- secondary_stage: the stage with the second-highest probability, or null if no runner-up is distinguishable\n- confidence_tier: low|medium|high\n- rationale: one concise evidence-bound paragraph\nNever answer \"unknown\", \"unclear\", or \"indeterminate\", and never return all-zero probabilities. Weak or\nconflicting evidence is reported by choosing the best-supported stage and setting confidence_tier to low;\nslide-level unreadability was already recorded by the preceding morphology pass.",
+      "raw_response": "{\n  \"raw_scores\": {\n    \"diestrus\": 2,\n    \"proestrus\": 3,\n    \"estrus\": 4,\n    \"metestrus\": 1\n  },\n  \"probabilities\": {\n    \"diestrus\": 0.1,\n    \"proestrus\": 0.2,\n    \"estrus\": 0.5,\n    \"metestrus\": 0.2\n  },\n  \"primary_stage\": \"estrus\",\n  \"secondary_stage\": \"proestrus\",\n  \"confidence_tier\": \"medium\",\n  \"rationale\": \"The slide shows a mixture of cornified squames, nucleated epithelial cells, and abundant leukocytes, with a predominance of cells exhibiting features consistent with estrus, such as high cellular density and prominent nucleated cells. The presence of abundant leukocytes and a mixed nuclear state supports a stage of heightened cellular activity, most aligned with estrus. The evidence does not strongly support a specific earlier or later stage, so proestrus is assigned as the secondary stage with medium confidence.\"\n}"
+    }
+  ],
+  "disclaimer": "Expected stages are textbook design expectations, not independently annotated ground truth. The fixed source image can conflict with the counterfactual morphology; exact matches measure prompt sensitivity, not biological accuracy.",
+  "model": {
+    "adapter_hash": "none",
+    "model_id": "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+    "model_revision": "defcdea7cc7a4b0858fea563cbbce171d328e457",
+    "prompt_prefix_reuse": "on"
+  },
+  "probe_type": "counterfactual_morphology_sensitivity",
+  "prompt_version": "morphology-first-v2",
+  "quadrant_max_edge": null,
+  "schema_version": "1.0",
+  "source_image": "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp",
+  "source_image_role": "fixed visual context; not probe ground truth",
+  "source_image_sha256": "f53bd0554a0a99e5c4e1ec7863709051a970da27a6c3347f260aa7a51b1c7271",
+  "summary": {
+    "cases": 4,
+    "design_expectation_matches": 0,
+    "parsed": 2
+  },
+  "view_pack_version": "overview-quadrants-v1"
+}

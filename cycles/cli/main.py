@@ -344,14 +344,17 @@ def _build_local_vlm_pipeline(
         model_revision=model_revision,
         reuse_prompt_prefix=reuse_prompt_prefix,
     )
-    lock_path = Path("uv.lock")
-    lock_hash = hashlib.sha256(lock_path.read_bytes()).hexdigest() if lock_path.is_file() else "unlocked"
     calibrator = TemperatureCalibrator.load(calibrator_path) if calibrator_path else None
     return LocalVLMPipeline(
         backend,
-        software_lock_hash=lock_hash,
+        software_lock_hash=_software_lock_hash(),
         calibrator=calibrator,
     )
+
+
+def _software_lock_hash() -> str:
+    lock_path = Path(__file__).resolve().parents[2] / "uv.lock"
+    return hashlib.sha256(lock_path.read_bytes()).hexdigest() if lock_path.is_file() else "unlocked"
 
 
 def _build_temporal_reconciler(margin_threshold: float, adjustment_threshold: float) -> Any:
@@ -551,7 +554,11 @@ def build_parser() -> argparse.ArgumentParser:
     vlm_local.add_argument("--model", required=True)
     vlm_local.add_argument("--output", type=Path, required=True)
     vlm_local.add_argument("--adapter", type=Path)
-    vlm_local.add_argument("--model-revision", default="unspecified")
+    vlm_local.add_argument(
+        "--model-revision",
+        required=True,
+        help="Immutable 40-character Hugging Face model commit SHA",
+    )
     vlm_local.add_argument("--calibrator", type=_existing_file)
     vlm_local.add_argument("--sequence-manifest", type=_existing_file)
     vlm_local.add_argument("--margin-threshold", type=float, default=0.15)

@@ -24,15 +24,15 @@
   pass changed cornified_squames on 3/24 and leukocytes on 4/24 images.
 - [ ] Re-run the resolution ablation as an accuracy comparison once teacher labels exist. Agreement
   cannot adjudicate which resolution is right; do not lower resolution before then.
-- [ ] **Blocking, ahead of the bakeoff: establish whether any candidate can stage zero-shot.**
-  Qwen3-VL 4B 8-bit scores 0/4 on textbook-unambiguous synthetic morphologies at high confidence and
-  returns a single stage for every real image. Run the same four synthetic cases against Qwen3-VL 8B
-  4-bit and Gemma 3 12B 4-bit before spending the full bakeoff; a model that cannot separate the four
-  textbook descriptions will not be separated by a group-bootstrap comparison on real slides.
-- [ ] Reconsider what the zero-shot bakeoff is for. If no candidate stages usefully zero-shot, the
-  accuracy-first comparison is measuring noise and the adapter is doing all the work; select the
-  base model on morphology-pass quality, memory, and latency instead, and compare stage accuracy
-  only after fine-tuning.
+- [x] Establish controlled morphology-to-stage sensitivity on all candidates. The original v2 probe
+  was misreported as accuracy even though its expected stages were design expectations and the fixed
+  image was not ground truth. It nevertheless exposed a real prompt/schema defect: v2 gave 0/4
+  expectation matches on every candidate and only 7/12 schema-valid responses overall. Prompt v3
+  defines the cytology criteria and asks only for relative evidence scores plus rationale; Qwen3-VL
+  4B, Qwen3-VL 8B, and Gemma 3 12B each produce 4/4 valid, 4/4 matching controlled outputs. Raw
+  artifacts are in `docs/probes/`. This proves contract compliance, not real-image accuracy.
+- [ ] Rerun a small labeled, non-held-out real-image comparison under prompt v3 before committing to
+  the full bakeoff. Do not infer accuracy from the controlled counterfactual probe.
 - [ ] Decide the view-pack resolution/accuracy tradeoff before the bakeoff. The pack sends 8.81 MP
   (a 1536-edge overview plus four full-resolution quadrants) from a 2880x2048 source, which is
   8,843 tokens and ~16 s of the remaining 21 s. Halving the quadrant edge would cut that roughly
@@ -51,6 +51,8 @@
 - [ ] Domain-adapt with teacher:broad replay ratios 1:3, 1:1, and 3:1; reject checkpoints with more
   than 0.02 broad-validation macro-F1 regression.
 - [ ] Fit temperature calibration and temporal margin/gain thresholds on validation data only.
+  The VLM's `raw_scores` are self-reported evidence values, not internal logits; validate empirically
+  that temperature scaling improves held-in validation NLL/Brier before calling them calibrated.
 - [ ] Upgrade the transition adjudication panel from call summaries to true side-by-side neighboring
   image comparison if reviewers need it during the blinded sequence pass.
 
@@ -71,5 +73,7 @@
 - [ ] Add a dedicated CLI command to fit and freeze a calibrator from validation raw scores.
 - [ ] Add temporal subset and calibrated-versus-uncalibrated gates directly to `vlm-benchmark`.
 - [ ] Add interruption-safe resume/checkpoint behavior for large local inference folders.
+- [ ] Decide and validate how temporal reconciliation handles repeated observations and irregular
+  day gaps; the current transition matrix advances once per record, not once per elapsed day.
 - [ ] Reassess multi-image SFT only after the upstream Qwen3-VL collation issue is demonstrably fixed.
 - [ ] Reconsider cell detection only after representative cell-level annotations exist.

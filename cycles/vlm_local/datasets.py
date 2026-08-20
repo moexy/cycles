@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
 CANONICAL_STAGES = {"diestrus", "proestrus", "estrus", "metestrus"}
 _STAGE_KEYS = ("stage", "label", "estrous_stage", "class_name")
 
@@ -55,6 +55,7 @@ def _prepare_estrousbank(source: Path, destination: Path, counts: Counter[str]) 
     if not shards or not all(shard.is_file() for shard in shards):
         raise FileNotFoundError(f"no EstrousBank tar shards found at {source}")
     streams: dict[str, Any] = {}
+    image_destinations: set[Path] = set()
     try:
         for shard in shards:
             split = _split_from_name(shard.name)
@@ -65,7 +66,8 @@ def _prepare_estrousbank(source: Path, destination: Path, counts: Counter[str]) 
                         continue
                     suffix = Path(member.name).suffix.lower()
                     if suffix == ".json" or suffix in IMAGE_SUFFIXES:
-                        members.setdefault(Path(member.name).stem, {})[suffix] = member
+                        sample_key = Path(member.name).with_suffix("").as_posix()
+                        members.setdefault(sample_key, {})[suffix] = member
                 for sample_key, sample_members in sorted(members.items()):
                     metadata_member = sample_members.get(".json")
                     image_member = next(
@@ -82,6 +84,9 @@ def _prepare_estrousbank(source: Path, destination: Path, counts: Counter[str]) 
                     stage = _find_stage(metadata)
                     safe_id = _safe_id(f"{shard.stem}-{sample_key}")
                     image_relative = Path("images") / split / f"{safe_id}{Path(image_member.name).suffix.lower()}"
+                    if image_relative in image_destinations:
+                        raise ValueError(f"safe filename collision: {image_relative}")
+                    image_destinations.add(image_relative)
                     image_path = destination / image_relative
                     image_path.parent.mkdir(parents=True, exist_ok=True)
                     image_path.write_bytes(image_stream.read())
@@ -108,6 +113,7 @@ def _prepare_teacher(source: Path, destination: Path, counts: Counter[str]) -> N
     if not dataset_path.is_file():
         raise FileNotFoundError(f"teacher dataset not found: {dataset_path}")
     output = (destination / "train.jsonl").open("x", encoding="utf-8")
+    image_destinations: set[Path] = set()
     try:
         with dataset_path.open(encoding="utf-8") as stream:
             for line_number, line in enumerate(stream, start=1):
@@ -126,6 +132,9 @@ def _prepare_teacher(source: Path, destination: Path, counts: Counter[str]) -> N
                     raise FileNotFoundError(f"teacher image not found: {source_image}")
                 safe_id = _safe_id(sample_id)
                 relative = Path("images") / "train" / f"{safe_id}{source_image.suffix.lower()}"
+                if relative in image_destinations:
+                    raise ValueError(f"safe filename collision: {relative}")
+                image_destinations.add(relative)
                 target = destination / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_image, target)

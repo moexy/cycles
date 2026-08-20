@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from collections import defaultdict
 from dataclasses import asdict
 from pathlib import Path
@@ -29,6 +30,12 @@ def benchmark_predictions(
 ) -> dict[str, Any]:
     predictions = _read_predictions(Path(predictions_path))
     labels = _read_labels(Path(labels_path))
+    if set(predictions) != set(labels):
+        missing = len(set(labels) - set(predictions))
+        extra = len(set(predictions) - set(labels))
+        raise ValueError(
+            f"prediction and label sample_id coverage differs: {missing} missing, {extra} extra"
+        )
     matched: list[tuple[dict[str, str], dict[str, Any]]] = []
     for sample_id, label in labels.items():
         prediction = predictions.get(sample_id)
@@ -61,9 +68,12 @@ def benchmark_predictions(
     }
     if baseline_predictions is not None:
         baseline = _read_predictions(Path(baseline_predictions))
-        missing = [label["sample_id"] for label, _ in matched if label["sample_id"] not in baseline]
-        if missing:
-            raise ValueError(f"baseline lacks {len(missing)} matched sample(s)")
+        if set(baseline) != set(labels):
+            missing = len(set(labels) - set(baseline))
+            extra = len(set(baseline) - set(labels))
+            raise ValueError(
+                f"baseline and label sample_id coverage differs: {missing} missing, {extra} extra"
+            )
         baseline_pred = [baseline[label["sample_id"]] for label, _ in matched]
         baseline_metrics = compute_classification_metrics(
             y_true,
@@ -181,6 +191,8 @@ def _read_predictions(path: Path) -> dict[str, dict[str, Any]]:
             image_prediction = payload.get("image_prediction")
             if not sample_id or not isinstance(image_prediction, dict):
                 raise ValueError(f"invalid prediction row {line_number}")
+            if sample_id in predictions:
+                raise ValueError(f"duplicate prediction sample_id on row {line_number}: {sample_id}")
             primary = image_prediction.get("primary_stage")
             probabilities = image_prediction.get("probabilities")
             if primary not in CANONICAL or not isinstance(probabilities, dict):
@@ -188,12 +200,21 @@ def _read_predictions(path: Path) -> dict[str, dict[str, Any]]:
             if set(probabilities) != set(CANONICAL):
                 raise ValueError(f"prediction row {line_number} lacks all four probabilities")
             parsed = {stage: float(probabilities[stage]) for stage in CANONICAL}
+            if any(not math.isfinite(value) for value in parsed.values()):
+                raise ValueError(f"probabilities must be finite on row {line_number}")
             if any(value < 0 for value in parsed.values()) or sum(parsed.values()) <= 0:
                 raise ValueError(f"invalid probabilities on row {line_number}")
             total = sum(parsed.values())
+            if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-6):
+                raise ValueError(f"probabilities must sum to 1 on row {line_number}")
+            maximum = max(parsed.values())
+            if not math.isclose(parsed[primary], maximum, rel_tol=0.0, abs_tol=1e-9):
+                raise ValueError(
+                    f"primary_stage must match the largest probability on row {line_number}"
+                )
             predictions[sample_id] = {
                 "primary_stage": primary,
-                "probabilities": {stage: value / total for stage, value in parsed.items()},
+                "probabilities": parsed,
             }
     return predictions
 
@@ -210,6 +231,8 @@ def _read_labels(path: Path) -> dict[str, dict[str, str]]:
             stage = (row.get("stage") or "").strip().lower()
             if not sample_id or stage not in CANONICAL:
                 raise ValueError(f"invalid label on row {row_number}")
+            if sample_id in labels:
+                raise ValueError(f"duplicate label sample_id on row {row_number}: {sample_id}")
             labels[sample_id] = {key: (value or "").strip() for key, value in row.items()}
             labels[sample_id]["stage"] = stage
     return labels

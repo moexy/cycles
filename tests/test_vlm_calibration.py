@@ -50,3 +50,16 @@ def test_temperature_fit_reduces_validation_negative_log_likelihood() -> None:
 
     assert fitted.temperature > 1.0
     assert fitted.negative_log_likelihood(scores, labels) < TemperatureCalibrator().negative_log_likelihood(scores, labels)
+
+
+@pytest.mark.parametrize("invalid", [math.inf, -math.inf, math.nan])
+def test_temperature_calibrator_rejects_non_finite_scores(invalid: float) -> None:
+    scores = {
+        EstrousStage.DIESTRUS: 0.0,
+        EstrousStage.PROESTRUS: 0.0,
+        EstrousStage.ESTRUS: invalid,
+        EstrousStage.METESTRUS: 0.0,
+    }
+
+    with pytest.raises(ValueError, match="finite"):
+        TemperatureCalibrator().transform(scores)

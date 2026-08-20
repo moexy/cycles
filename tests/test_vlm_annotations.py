@@ -96,6 +96,7 @@ def test_frozen_export_uses_latest_review_and_preserves_model_record(tmp_path: P
     assert summary["exported_samples"] == 1
     assert payload["model_record"]["image_prediction"]["primary_stage"] == "estrus"
     assert payload["teacher_label"]["primary_stage"] == "metestrus"
+    assert payload["teacher_label"]["secondary_stage"] is None
     assert payload["teacher_label"]["confidence_tier"] == "medium"
     assert len((tmp_path / "teacher-v1" / "manifest.sha256").read_text().split()[0]) == 64
 
@@ -121,3 +122,35 @@ def test_annotation_store_rejects_unversioned_or_unknown_corrections(tmp_path: P
             action="correct",
             corrections={"model_id": "mutated"},
         )
+
+    with pytest.raises(ValueError, match="primary_stage"):
+        store.append(
+            _record(),
+            reviewer_id="reviewer-a",
+            action="correct",
+            corrections={"primary_stage": "not-a-stage"},
+        )
+
+
+def test_annotation_store_rejects_corrections_on_non_correction_actions(tmp_path: Path) -> None:
+    store = AnnotationStore(tmp_path / "reviews.jsonl")
+
+    with pytest.raises(ValueError, match="only valid for correct"):
+        store.append(
+            _record(),
+            reviewer_id="reviewer-a",
+            action="accept",
+            corrections={"primary_stage": "metestrus"},
+        )
+
+
+def test_annotation_store_revalidates_events_read_from_disk(tmp_path: Path) -> None:
+    path = tmp_path / "reviews.jsonl"
+    event = AnnotationStore(path).append(
+        _record(), reviewer_id="reviewer-a", action="accept"
+    ).to_dict()
+    event["action"] = "silently_mutated"
+    path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid annotation event"):
+        AnnotationStore(path).events()

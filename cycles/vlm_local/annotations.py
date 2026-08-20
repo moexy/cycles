@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from cycles.vlm_local.schema import LocalVLMRecord
+from cycles.core.types import EstrousStage
+from cycles.vlm_local.schema import (
+    Abundance,
+    Arrangement,
+    ConfidenceTier,
+    LocalVLMRecord,
+    NuclearState,
+    QCStatus,
+)
 
 ACTIONS = frozenset({"accept", "correct", "ungradable", "defer"})
 CORRECTION_FIELDS = frozenset(
@@ -45,7 +54,9 @@ class AnnotationEvent:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> AnnotationEvent:
-        return cls(**payload)
+        event = cls(**payload)
+        _validate_event(event)
+        return event
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,6 +85,9 @@ class AnnotationStore:
             raise ValueError(f"unsupported correction field(s): {', '.join(sorted(unknown))}")
         if action == "correct" and not corrections:
             raise ValueError("correct action requires at least one corrected field")
+        if action != "correct" and corrections:
+            raise ValueError("corrections are only valid for correct actions")
+        _validate_corrections(corrections)
         event = AnnotationEvent(
             event_id=str(uuid.uuid4()),
             schema_version="1.0",
@@ -166,6 +180,71 @@ def record_hash(record: LocalVLMRecord) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _validate_corrections(corrections: dict[str, Any]) -> None:
+    enum_fields = {
+        "confidence_tier": ConfidenceTier,
+        "cornified_squames": Abundance,
+        "nucleated_epithelial": Abundance,
+        "leukocytes": Abundance,
+        "nuclear_state": NuclearState,
+        "arrangement": Arrangement,
+        "qc_status": QCStatus,
+    }
+    for field, enum_type in enum_fields.items():
+        if field in corrections:
+            try:
+                enum_type(corrections[field])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid {field} correction") from exc
+    for field in ("primary_stage", "secondary_stage"):
+        if field not in corrections or corrections[field] is None:
+            continue
+        try:
+            stage = EstrousStage(corrections[field])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"invalid {field} correction") from exc
+        if stage not in EstrousStage.canonical_stages():
+            raise ValueError(f"invalid {field} correction")
+    for field in ("artifacts", "qc_reasons", "evidence"):
+        if field in corrections and (
+            not isinstance(corrections[field], list)
+            or not all(isinstance(item, str) for item in corrections[field])
+        ):
+            raise ValueError(f"invalid {field} correction")
+
+
+def _validate_event(event: AnnotationEvent) -> None:
+    if event.schema_version != "1.0":
+        raise ValueError("unsupported annotation event schema")
+    if event.action not in ACTIONS:
+        raise ValueError("unsupported annotation action")
+    for field in ("event_id", "timestamp", "reviewer_id", "sample_id", "record_hash"):
+        value = getattr(event, field)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"invalid annotation {field}")
+    try:
+        uuid.UUID(event.event_id)
+        parsed_time = datetime.fromisoformat(event.timestamp)
+    except ValueError as exc:
+        raise ValueError("invalid annotation identity or timestamp") from exc
+    if parsed_time.tzinfo is None:
+        raise ValueError("annotation timestamp must include a timezone")
+    if re.fullmatch(r"[0-9a-f]{64}", event.record_hash) is None:
+        raise ValueError("invalid annotation record_hash")
+    if not isinstance(event.corrections, dict):
+        raise ValueError("annotation corrections must be an object")
+    unknown = set(event.corrections) - CORRECTION_FIELDS
+    if unknown:
+        raise ValueError("unsupported annotation correction field")
+    if event.action == "correct" and not event.corrections:
+        raise ValueError("correct annotation requires corrections")
+    if event.action != "correct" and event.corrections:
+        raise ValueError("corrections are only valid for correct actions")
+    if not isinstance(event.note, str):
+        raise ValueError("annotation note must be a string")
+    _validate_corrections(event.corrections)
+
+
 def _teacher_label(record: LocalVLMRecord, event: AnnotationEvent) -> dict[str, Any]:
     prediction = record.image_prediction
     morphology = record.morphology
@@ -187,6 +266,8 @@ def _teacher_label(record: LocalVLMRecord, event: AnnotationEvent) -> dict[str, 
     if event.action == "ungradable":
         label.update(primary_stage=None, secondary_stage=None, qc_status="ungradable")
     label.update(event.corrections)
+    if label["primary_stage"] == label["secondary_stage"]:
+        label["secondary_stage"] = None
     return label
 
 

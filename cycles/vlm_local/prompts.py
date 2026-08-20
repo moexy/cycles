@@ -6,7 +6,7 @@ import json
 
 from cycles.vlm_local.schema import MorphologyObservation
 
-PROMPT_VERSION = "morphology-first-v2"
+PROMPT_VERSION = "morphology-first-v3"
 
 
 MORPHOLOGY_PROMPT = """You are reviewing five views from one rodent vaginal cytology slide: a whole-field overview followed by four overlapping quadrants.
@@ -34,23 +34,25 @@ def stage_prompt(morphology: MorphologyObservation) -> str:
         "qc_reasons": list(morphology.qc_reasons),
         "evidence": list(morphology.evidence),
     }
-    return f"""Score the same slide against the four canonical stages: diestrus, proestrus, estrus, and metestrus.
-Use the images and the stage-blind morphology below. Do not invent findings that are absent from the evidence.
+    return f"""Score the same slide against these explicit rodent vaginal cytology criteria:
+- diestrus: leukocytes dominate; epithelial cells are sparse and cornified squames are few or absent
+- proestrus: nucleated epithelial cells dominate; leukocytes are few or absent and cornification is low
+- estrus: anucleate cornified squames dominate, often in sheets; leukocytes and nucleated epithelial cells are few or absent
+- metestrus: a transitional mixture of cornified squames, nucleated epithelial cells, and leukocytes; cornification alone is not metestrus
+Use the stage-blind morphology below as the primary evidence summary and the images only to check it.
+Do not invent findings that are absent from the evidence.
 Morphology: {json.dumps(payload, sort_keys=True)}
 Return JSON only, with these exact fields:
-- raw_scores: object with all four stage names as keys and unbounded numeric scores as values
-- probabilities: object with all four stage names as keys, each at least 0, together summing to 1
-- primary_stage: exactly one of diestrus|proestrus|estrus|metestrus, the stage with the highest probability
-- secondary_stage: the stage with the second-highest probability, or null if no runner-up is distinguishable
-- confidence_tier: low|medium|high
+- raw_scores: object with all four stage names as keys and finite relative evidence scores as values; these are not probabilities
 - rationale: one concise evidence-bound paragraph
-Never answer "unknown", "unclear", or "indeterminate", and never return all-zero probabilities. Weak or
-conflicting evidence is reported by choosing the best-supported stage and setting confidence_tier to low;
-slide-level unreadability was already recorded by the preceding morphology pass."""
+Do not calculate probabilities, choose a stage label, or report confidence; those fields are derived
+deterministically from raw_scores. Slide-level unreadability was already recorded by the morphology pass."""
 
 
-def repair_prompt(response: str, error: Exception) -> str:
-    return f"""Repair the following response into valid JSON matching the previously requested schema.
+def repair_prompt(original_prompt: str, response: str, error: Exception) -> str:
+    return f"""Repair the following response into valid JSON matching this original request:
+{original_prompt}
+
 Do not add new image findings. Return JSON only.
 Validation error: {error}
 Response: {response}"""

@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable
-from dataclasses import replace
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -13,10 +12,12 @@ from cycles.vlm_local.backend import VLMBackend
 from cycles.vlm_local.calibration import TemperatureCalibrator
 from cycles.vlm_local.prompts import MORPHOLOGY_PROMPT, PROMPT_VERSION, repair_prompt, stage_prompt
 from cycles.vlm_local.schema import (
+    ConfidenceTier,
     ImagePrediction,
     LocalVLMRecord,
     MorphologyObservation,
     SequencePrediction,
+    StageEvidence,
 )
 from cycles.vlm_local.views import VIEW_PACK_VERSION, build_view_pack
 
@@ -56,16 +57,15 @@ class LocalVLMPipeline:
         if morphology is None:
             return self._ungradable_record(path, sample_id, subject_id, day)
 
-        prediction = self._request(
+        evidence = self._request(
             images,
             stage_prompt(morphology),
-            ImagePrediction.from_dict,
+            StageEvidence.from_dict,
         )
-        if prediction is None:
-            morphology = MorphologyObservation.ungradable("invalid_model_output")
+        if evidence is None:
             prediction = ImagePrediction.ungradable("Model output failed schema validation")
         else:
-            prediction = self._calibrate(prediction)
+            prediction = calibrate_stage_evidence(evidence, self.calibrator)
 
         return LocalVLMRecord(
             sample_id=sample_id or path.stem,
@@ -100,7 +100,7 @@ class LocalVLMPipeline:
         try:
             return parser(_parse_json_object(response))
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as first_error:
-            repaired = self.backend.generate(images, repair_prompt(response, first_error))
+            repaired = self.backend.generate(images, repair_prompt(prompt, response, first_error))
             try:
                 return parser(_parse_json_object(repaired))
             except (KeyError, TypeError, ValueError, json.JSONDecodeError):
@@ -133,24 +133,29 @@ class LocalVLMPipeline:
             },
         )
 
-    def _calibrate(self, prediction: ImagePrediction) -> ImagePrediction:
-        probabilities = self.calibrator.transform(prediction.raw_scores)
-        ranked = sorted(probabilities, key=probabilities.__getitem__, reverse=True)
-        margin = probabilities[ranked[0]] - probabilities[ranked[1]]
-        confidence = (
-            prediction.confidence_tier.__class__.HIGH
-            if margin >= 0.50
-            else prediction.confidence_tier.__class__.MEDIUM
-            if margin >= 0.20
-            else prediction.confidence_tier.__class__.LOW
-        )
-        return replace(
-            prediction,
-            primary_stage=ranked[0],
-            secondary_stage=ranked[1],
-            probabilities=probabilities,
-            confidence_tier=confidence,
-        )
+
+def calibrate_stage_evidence(
+    evidence: StageEvidence,
+    calibrator: TemperatureCalibrator,
+) -> ImagePrediction:
+    probabilities = calibrator.transform(evidence.raw_scores)
+    ranked = sorted(probabilities, key=probabilities.__getitem__, reverse=True)
+    margin = probabilities[ranked[0]] - probabilities[ranked[1]]
+    confidence = (
+        ConfidenceTier.HIGH
+        if margin >= 0.50
+        else ConfidenceTier.MEDIUM
+        if margin >= 0.20
+        else ConfidenceTier.LOW
+    )
+    return ImagePrediction(
+        primary_stage=ranked[0],
+        secondary_stage=ranked[1],
+        raw_scores=evidence.raw_scores,
+        probabilities=probabilities,
+        confidence_tier=confidence,
+        rationale=evidence.rationale,
+    )
 
 
 def _parse_json_object(value: str) -> dict[str, Any]:

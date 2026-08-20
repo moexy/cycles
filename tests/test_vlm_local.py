@@ -10,7 +10,8 @@ from PIL import Image
 from cycles.core.types import EstrousStage
 from cycles.vlm_local.calibration import TemperatureCalibrator
 from cycles.vlm_local.pipeline import LocalVLMPipeline
-from cycles.vlm_local.schema import ImagePrediction, QCStatus
+from cycles.vlm_local.prompts import PROMPT_VERSION, stage_prompt
+from cycles.vlm_local.schema import ImagePrediction, MorphologyObservation, QCStatus
 from cycles.vlm_local.views import build_view_pack
 
 
@@ -102,7 +103,7 @@ def test_pipeline_runs_stage_blind_morphology_before_stage_scoring(tmp_path: Pat
 
     assert backend.view_counts == [5, 5]
     assert "Do not assign an estrous stage" in backend.prompts[0]
-    assert "four canonical stages" in backend.prompts[1]
+    assert "explicit rodent vaginal cytology criteria" in backend.prompts[1]
     assert record.morphology.cornified_squames.value == "dominant"
     assert record.image_prediction.primary_stage.value == "estrus"
     assert record.image_prediction.secondary_stage.value == "metestrus"
@@ -121,6 +122,7 @@ def test_pipeline_repairs_malformed_stage_json_once(tmp_path: Path) -> None:
 
     assert len(backend.prompts) == 3
     assert "Repair the following response" in backend.prompts[-1]
+    assert "raw_scores" in backend.prompts[-1]
     assert record.image_prediction.primary_stage.value == "estrus"
 
 
@@ -130,10 +132,21 @@ def test_pipeline_marks_persistently_invalid_output_ungradable(tmp_path: Path) -
 
     record = LocalVLMPipeline(backend=backend).classify_image(image_path)
 
-    assert record.morphology.qc_status is QCStatus.UNGRADABLE
+    assert record.morphology.qc_status is QCStatus.USABLE
+    assert record.morphology.cornified_squames.value == "dominant"
     assert record.image_prediction.primary_stage is None
     assert record.sequence_prediction.final_stage is None
-    assert "invalid_model_output" in record.morphology.qc_reasons
+
+
+def test_ungradable_stage_record_round_trips_without_inventing_a_stage(tmp_path: Path) -> None:
+    image_path = _sample_image(tmp_path / "slide.png")
+    backend = ScriptedBackend([_morphology_response(), "not json", "still not json"])
+
+    original = LocalVLMPipeline(backend=backend).classify_image(image_path)
+    restored = type(original).from_dict(original.to_dict())
+
+    assert restored == original
+    assert restored.image_prediction.primary_stage is None
 
 
 def test_record_serialization_preserves_all_stage_probabilities(tmp_path: Path) -> None:
@@ -179,6 +192,41 @@ def test_pipeline_applies_validation_calibrator_to_raw_scores(tmp_path: Path) ->
     assert record.image_prediction.primary_stage is not None
     assert record.image_prediction.primary_stage.value == "estrus"
     assert record.provenance["calibrator_hash"] == calibrator.sha256
+
+
+def test_stage_prompt_defines_the_domain_mapping_and_avoids_model_arithmetic() -> None:
+    prompt = stage_prompt(MorphologyObservation.from_dict(json.loads(_morphology_response())))
+
+    assert PROMPT_VERSION == "morphology-first-v3"
+    assert "diestrus: leukocytes dominate" in prompt
+    assert "proestrus: nucleated epithelial cells dominate" in prompt
+    assert "estrus: anucleate cornified squames dominate" in prompt
+    assert "metestrus: a transitional mixture" in prompt
+    assert "- probabilities:" not in prompt
+    assert "- primary_stage:" not in prompt
+
+
+def test_pipeline_derives_stage_from_minimal_evidence_scores(tmp_path: Path) -> None:
+    image_path = _sample_image(tmp_path / "slide.png")
+    stage_response = json.dumps(
+        {
+            "raw_scores": {
+                "diestrus": -2.0,
+                "proestrus": -1.0,
+                "estrus": 3.0,
+                "metestrus": 0.0,
+            },
+            "rationale": "Dominant anucleate cornified sheets support estrus.",
+        }
+    )
+
+    record = LocalVLMPipeline(
+        backend=ScriptedBackend([_morphology_response(), stage_response])
+    ).classify_image(image_path)
+
+    assert record.image_prediction.primary_stage is EstrousStage.ESTRUS
+    assert record.image_prediction.secondary_stage is EstrousStage.METESTRUS
+    assert sum(record.image_prediction.probabilities.values()) == pytest.approx(1.0)
 
 
 def test_image_prediction_accepts_confident_one_hot_distribution() -> None:
@@ -228,6 +276,37 @@ def test_image_prediction_rejects_secondary_that_is_not_runner_up() -> None:
     }
 
     with pytest.raises(ValueError, match="second-largest probability"):
+        ImagePrediction.from_dict(payload)
+
+
+@pytest.mark.parametrize("field", ["raw_scores", "probabilities"])
+@pytest.mark.parametrize("invalid", [float("inf"), float("-inf"), float("nan")])
+def test_image_prediction_rejects_non_finite_stage_values(field: str, invalid: float) -> None:
+    payload = {
+        "raw_scores": {"diestrus": 0.1, "proestrus": 0.1, "estrus": 0.1, "metestrus": 0.7},
+        "probabilities": {"diestrus": 0.1, "proestrus": 0.1, "estrus": 0.1, "metestrus": 0.7},
+        "primary_stage": "metestrus",
+        "secondary_stage": "diestrus",
+        "confidence_tier": "high",
+        "rationale": "A syntactically complete but numerically invalid record.",
+    }
+    payload[field]["estrus"] = invalid
+
+    with pytest.raises(ValueError, match="finite"):
+        ImagePrediction.from_dict(payload)
+
+
+def test_image_prediction_rejects_probabilities_that_do_not_sum_to_one() -> None:
+    payload = {
+        "raw_scores": {"diestrus": 0.1, "proestrus": 0.1, "estrus": 0.1, "metestrus": 0.7},
+        "probabilities": {"diestrus": 1.0, "proestrus": 1.0, "estrus": 1.0, "metestrus": 7.0},
+        "primary_stage": "metestrus",
+        "secondary_stage": "diestrus",
+        "confidence_tier": "high",
+        "rationale": "These are weights rather than the requested probabilities.",
+    }
+
+    with pytest.raises(ValueError, match="sum to 1"):
         ImagePrediction.from_dict(payload)
 
 

@@ -4,11 +4,13 @@ import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
+import pytest
 from PIL import Image
 
 from cycles.vlm_local.backend import MLXVLMBackend
 
 IMAGE_TOKEN = "<|image_pad|>"
+REVISION = "a" * 40
 
 
 def _fake_mlx_vlm(captured: dict[str, object]) -> ModuleType:
@@ -73,7 +75,7 @@ def _install_fake_mlx_vlm(monkeypatch, captured: dict[str, object]) -> None:
 def test_mlx_backend_materializes_lossless_paths_for_installed_api(monkeypatch) -> None:
     captured: dict[str, object] = {}
     _install_fake_mlx_vlm(monkeypatch, captured)
-    backend = MLXVLMBackend("test/model", model_revision="rev-1")
+    backend = MLXVLMBackend("test/model", model_revision=REVISION)
 
     response = backend.generate(
         [Image.new("RGB", (8, 8)), Image.new("RGB", (4, 4))],
@@ -81,7 +83,7 @@ def test_mlx_backend_materializes_lossless_paths_for_installed_api(monkeypatch) 
     )
 
     assert response == '{"ok": true}'
-    assert captured["load"] == ("test/model", {"revision": "rev-1"})
+    assert captured["load"] == ("test/model", {"revision": REVISION})
     kwargs = dict(captured["kwargs"])  # type: ignore[arg-type]
     kwargs.pop("prompt_cache_state")
     assert kwargs == {"max_tokens": 1024, "verbose": False}
@@ -92,7 +94,7 @@ def test_mlx_backend_applies_chat_template_with_one_token_per_view(monkeypatch) 
     """Each materialized view needs its own placeholder or the scatter fails."""
     captured: dict[str, object] = {}
     _install_fake_mlx_vlm(monkeypatch, captured)
-    backend = MLXVLMBackend("test/model")
+    backend = MLXVLMBackend("test/model", model_revision=REVISION)
 
     backend.generate([Image.new("RGB", (8, 8))] * 4, "inspect")
 
@@ -107,7 +109,7 @@ def test_prompt_cache_is_shared_across_passes_and_reset_between_slides(monkeypat
     captured: dict[str, object] = {}
     _install_fake_mlx_vlm(monkeypatch, captured)
     FakePromptCacheState.instances = 0
-    backend = MLXVLMBackend("test/model")
+    backend = MLXVLMBackend("test/model", model_revision=REVISION)
 
     slide = [Image.new("RGB", (8, 8), "red")]
     first = backend._cache_state_for(("digest-a",))
@@ -120,3 +122,27 @@ def test_prompt_cache_is_shared_across_passes_and_reset_between_slides(monkeypat
 
     backend.generate(slide, "inspect")
     assert captured["kwargs"]["prompt_cache_state"] is not None  # type: ignore[index]
+
+
+def test_prompt_cache_identity_includes_image_dimensions(monkeypatch) -> None:
+    """Equal pixel bytes with different geometry are different vision inputs."""
+    captured: dict[str, object] = {}
+    _install_fake_mlx_vlm(monkeypatch, captured)
+    FakePromptCacheState.instances = 0
+    backend = MLXVLMBackend("test/model", model_revision=REVISION)
+
+    backend.generate([Image.new("RGB", (2, 1), "red")], "first")
+    backend.generate([Image.new("RGB", (1, 2), "red")], "second")
+
+    assert FakePromptCacheState.instances == 2
+
+
+@pytest.mark.parametrize("revision", ["unspecified", "main", "rev-1", ""])
+def test_mlx_backend_requires_an_immutable_model_revision(
+    monkeypatch, revision: str
+) -> None:
+    captured: dict[str, object] = {}
+    _install_fake_mlx_vlm(monkeypatch, captured)
+
+    with pytest.raises(ValueError, match="40-character commit"):
+        MLXVLMBackend("test/model", model_revision=revision)

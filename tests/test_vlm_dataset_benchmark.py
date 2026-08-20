@@ -6,6 +6,7 @@ import json
 import tarfile
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from cycles.vlm_local.benchmark import benchmark_predictions
@@ -76,6 +77,34 @@ def test_prepare_blind_teacher_emits_morphology_supervision(tmp_path: Path) -> N
     assert answer["primary_stage"] == "metestrus"
     assert answer["leukocytes"] == "present"
     assert row["metadata"]["supervision"] == "teacher"
+
+
+def test_prepare_blind_teacher_rejects_safe_filename_collisions(tmp_path: Path) -> None:
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    first.write_bytes(_png_bytes())
+    second.write_bytes(_png_bytes())
+    source = tmp_path / "teacher.jsonl"
+    source.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "sample_id": sample_id,
+                    "model_record": {"image_path": str(image)},
+                    "teacher_label": {"primary_stage": "estrus"},
+                }
+            )
+            + "\n"
+            for sample_id, image in (("a b", first), ("a_b", second))
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "prepared"
+
+    with pytest.raises(ValueError, match="safe filename collision"):
+        prepare_sft_dataset("blind-teacher", source, output)
+
+    assert not output.exists()
 
 
 def test_benchmark_reports_calibration_and_subgroups(tmp_path: Path) -> None:
@@ -176,3 +205,142 @@ def test_benchmark_uses_group_bootstrap_and_subgroup_safety_gates(tmp_path: Path
     assert report["comparison"]["group_bootstrap_95_ci"][1] <= 1.0
     assert report["gates"]["relative_improvement"] is True
     assert report["gates"]["subgroup_safety"] is True
+
+
+def test_benchmark_rejects_duplicate_prediction_ids(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    labels = tmp_path / "labels.csv"
+    output = tmp_path / "report"
+    row = {
+        "sample_id": "duplicate",
+        "image_prediction": {
+            "primary_stage": "estrus",
+            "probabilities": {
+                "diestrus": 0.1,
+                "proestrus": 0.1,
+                "estrus": 0.7,
+                "metestrus": 0.1,
+            },
+        },
+    }
+    predictions.write_text(json.dumps(row) + "\n" + json.dumps(row) + "\n", encoding="utf-8")
+    labels.write_text("sample_id,stage\nduplicate,estrus\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate prediction sample_id"):
+        benchmark_predictions(predictions, labels, output)
+
+
+def test_benchmark_rejects_duplicate_label_ids(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    labels = tmp_path / "labels.csv"
+    output = tmp_path / "report"
+    predictions.write_text(
+        json.dumps(
+            {
+                "sample_id": "duplicate",
+                "image_prediction": {
+                    "primary_stage": "estrus",
+                    "probabilities": {
+                        "diestrus": 0.1,
+                        "proestrus": 0.1,
+                        "estrus": 0.7,
+                        "metestrus": 0.1,
+                    },
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels.write_text(
+        "sample_id,stage\nduplicate,estrus\nduplicate,estrus\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="duplicate label sample_id"):
+        benchmark_predictions(predictions, labels, output)
+
+
+@pytest.mark.parametrize(
+    ("probabilities", "message"),
+    [
+        ({"diestrus": 0.1, "proestrus": 0.1, "estrus": float("nan"), "metestrus": 0.7}, "finite"),
+        ({"diestrus": 1.0, "proestrus": 1.0, "estrus": 1.0, "metestrus": 7.0}, "sum to 1"),
+    ],
+)
+def test_benchmark_rejects_invalid_probability_distributions(
+    tmp_path: Path, probabilities: dict[str, float], message: str
+) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text(
+        json.dumps(
+            {
+                "sample_id": "s1",
+                "image_prediction": {
+                    "primary_stage": "metestrus",
+                    "probabilities": probabilities,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels = tmp_path / "labels.csv"
+    labels.write_text("sample_id,stage\ns1,metestrus\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        benchmark_predictions(predictions, labels, tmp_path / "report")
+
+
+def test_benchmark_rejects_primary_stage_below_probability_mode(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text(
+        json.dumps(
+            {
+                "sample_id": "s1",
+                "image_prediction": {
+                    "primary_stage": "diestrus",
+                    "probabilities": {
+                        "diestrus": 0.1,
+                        "proestrus": 0.1,
+                        "estrus": 0.1,
+                        "metestrus": 0.7,
+                    },
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels = tmp_path / "labels.csv"
+    labels.write_text("sample_id,stage\ns1,metestrus\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="largest probability"):
+        benchmark_predictions(predictions, labels, tmp_path / "report")
+
+
+def test_benchmark_rejects_partial_sample_coverage(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.jsonl"
+    predictions.write_text(
+        json.dumps(
+            {
+                "sample_id": "s1",
+                "image_prediction": {
+                    "primary_stage": "estrus",
+                    "probabilities": {
+                        "diestrus": 0.1,
+                        "proestrus": 0.1,
+                        "estrus": 0.7,
+                        "metestrus": 0.1,
+                    },
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    labels = tmp_path / "labels.csv"
+    labels.write_text("sample_id,stage\ns1,estrus\ns2,diestrus\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="sample_id coverage"):
+        benchmark_predictions(predictions, labels, tmp_path / "report")
