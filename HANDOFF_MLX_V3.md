@@ -63,8 +63,31 @@ peak overall       6.949 GiB         (budget 36 GiB)
 The stage above is a model output on a training image, not a validated result, and carries no
 evidentiary weight for accuracy. It shows only that the path runs and emits a schema-valid record.
 
-Latency is worth noting before the bakeoff: 59 s/image on the smallest candidate implies roughly
-5.6 hours for a single pass over the 343 teacher images, and the 8B/12B candidates will be slower.
+That first measurement was 59 s/image, which was too slow to be believed, and profiling confirmed it.
+The model was never the bottleneck: decode runs at 58-74 tok/s, normal for a 4B 8-bit model here.
+The time went to re-encoding an 8,843-token view pack up to three times per image - a repair
+round-trip fired on every confident image, the two passes each paid full cold prefill despite sending
+an identical view pack, and an underspecified stage prompt provoked a second repair. All three are
+fixed in `471b536`:
+
+```text
+before   62.2 s / image   3 generate calls   pass-2 prefill    539 tok/s
+after    21.2 s / image   2 generate calls   pass-2 prefill 17,800 tok/s
+```
+
+A pass over the 343 teacher images is now roughly 2 hours rather than 5.6, per model.
+
+What remains is the view pack itself: 8.81 MP from a 2880x2048 source (a 1536-edge overview plus four
+full-resolution quadrants covering the same field again) is 8,843 tokens and about 16 s of the
+remaining 21 s. Cutting it is the only large lever left, and it is a scientific question rather than
+an engineering one - whether lower magnification still separates clear from ghost nuclei should be
+settled by ablation, not assumed.
+
+One property to carry into the bakeoff: reusing the KV prefix is a different numeric path. Both modes
+are deterministic - repeated runs agree bit for bit - but reused and cold prefill can disagree on
+knife-edge images where the model sits near-uniform across stages. Provenance records
+`prompt_prefix_reuse`, and `--no-prompt-prefix-reuse` forces cold prefill. Scored runs must not mix
+the two modes.
 
 ## What is implemented
 

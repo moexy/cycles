@@ -13,9 +13,17 @@
   found three real defects, fixed in `e7e6521`. Peak 6.95 GiB, 59 s/image.
 - [ ] Repeat the smoke test for the two remaining candidates (Qwen3-VL 8B 4-bit, Gemma 3 12B 4-bit)
   before the bakeoff, confirming peak allocation stays under 36 GiB at the larger sizes.
-- [ ] Decide whether 59 s/image is acceptable. A single pass over the 343 teacher images is ~5.6 h on
-  the smallest candidate, and the bakeoff runs three models; consider reducing the view pack or
-  batching before committing to the full matrix.
+- [x] Diagnose the 59 s/image latency. The model was never the bottleneck (decode 58-74 tok/s). Three
+  causes fixed in `471b536`: a repair round-trip on every confident image, no prefix reuse between
+  the two passes, and an underspecified stage prompt. Now 21 s/image, ~2 h for the 343 teacher
+  images.
+- [ ] Decide the view-pack resolution/accuracy tradeoff before the bakeoff. The pack sends 8.81 MP
+  (a 1536-edge overview plus four full-resolution quadrants) from a 2880x2048 source, which is
+  8,843 tokens and ~16 s of the remaining 21 s. Halving the quadrant edge would cut that roughly
+  fourfold. Whether that loses the nuclear detail separating clear from ghost nuclei is an empirical
+  question; run it as an ablation rather than assuming either way.
+- [ ] Fix the prefill mode for all scored runs and state it in the frozen configuration. Prefix reuse
+  is self-consistent but not bit-identical to cold prefill, so a bakeoff must not mix the two.
 
 ## P1 — select and train
 
