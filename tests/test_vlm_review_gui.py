@@ -261,3 +261,41 @@ def test_blinded_workspace_leaks_no_identifier_into_any_widget_text(
     workspace.set_blinded(False)
     qapp.processEvents()
     assert "sample-zzz-secret" in _widget_text(workspace)
+
+
+def test_unblinded_transition_panel_shows_neighboring_images(
+    qapp: QApplication, qtbot: QtBot, tmp_path: Path
+) -> None:
+    img1 = tmp_path / "img1.png"
+    img2 = tmp_path / "img2.png"
+    img3 = tmp_path / "img3.png"
+    for img in (img1, img2, img3):
+        Image.new("RGB", (100, 80), (20, 80, 160)).save(img)
+
+    records = [
+        _record(img1, sample_id="s1", subject_id="m1", day=1, primary=EstrousStage.PROESTRUS, secondary=EstrousStage.ESTRUS, primary_probability=0.9, secondary_probability=0.05),
+        _record(img2, sample_id="s2", subject_id="m1", day=2, primary=EstrousStage.METESTRUS, secondary=EstrousStage.ESTRUS, primary_probability=0.46, secondary_probability=0.44),
+        _record(img3, sample_id="s3", subject_id="m1", day=3, primary=EstrousStage.DIESTRUS, secondary=EstrousStage.METESTRUS, primary_probability=0.9, secondary_probability=0.05),
+    ]
+
+    workspace = VLMReviewWorkspace(reviewer_id="reviewer-a")
+    qtbot.addWidget(workspace)
+    workspace.set_records(records, AnnotationStore(tmp_path / "reviews.jsonl"))
+    workspace.show()
+    qapp.processEvents()
+
+    # In blinded mode, neighbors are hidden
+    assert workspace.transition_neighbors_container.isHidden() is True
+
+    # When unblinded, select sample s2 (row index 1 in unblinded order)
+    workspace.set_blinded(False)
+    workspace.queue_list.setCurrentRow(1)
+    qapp.processEvents()
+
+    assert workspace.transition_panel.isVisible() is True
+    assert workspace.transition_neighbors_container.isVisible() is True
+    assert "Day 1" in workspace.neighbor_prev_text.text()
+    assert "Day 3" in workspace.neighbor_next_text.text()
+    assert workspace.neighbor_prev_image.pixmap() is not None
+    assert workspace.neighbor_next_image.pixmap() is not None
+

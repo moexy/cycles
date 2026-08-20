@@ -207,11 +207,48 @@ class VLMReviewWorkspace(QWidget):
         prediction_form.addRow("Confidence", self.confidence_combo)
 
         self.transition_panel = QGroupBox("Adjacent-stage transition adjudication")
-        transition_layout = QHBoxLayout(self.transition_panel)
+        transition_layout = QVBoxLayout(self.transition_panel)
+        summary_row = QHBoxLayout()
         self.transition_primary = QLabel("Primary: —")
         self.transition_secondary = QLabel("Secondary: —")
-        transition_layout.addWidget(self.transition_primary)
-        transition_layout.addWidget(self.transition_secondary)
+        summary_row.addWidget(self.transition_primary)
+        summary_row.addWidget(self.transition_secondary)
+        transition_layout.addLayout(summary_row)
+
+        self.transition_neighbors_container = QWidget()
+        neighbors_layout = QHBoxLayout(self.transition_neighbors_container)
+        neighbors_layout.setContentsMargins(0, 0, 0, 0)
+
+        prev_box = QVBoxLayout()
+        self.neighbor_prev_title = QLabel("Previous Observation")
+        self.neighbor_prev_title.setStyleSheet("font-weight: bold; font-size: 11px;")
+        self.neighbor_prev_image = QLabel()
+        self.neighbor_prev_image.setFixedSize(140, 100)
+        self.neighbor_prev_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.neighbor_prev_image.setStyleSheet("border: 1px solid #d1d5db; background: #f3f4f6;")
+        self.neighbor_prev_text = QLabel("—")
+        self.neighbor_prev_text.setWordWrap(True)
+        prev_box.addWidget(self.neighbor_prev_title)
+        prev_box.addWidget(self.neighbor_prev_image)
+        prev_box.addWidget(self.neighbor_prev_text)
+
+        next_box = QVBoxLayout()
+        self.neighbor_next_title = QLabel("Next Observation")
+        self.neighbor_next_title.setStyleSheet("font-weight: bold; font-size: 11px;")
+        self.neighbor_next_image = QLabel()
+        self.neighbor_next_image.setFixedSize(140, 100)
+        self.neighbor_next_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.neighbor_next_image.setStyleSheet("border: 1px solid #d1d5db; background: #f3f4f6;")
+        self.neighbor_next_text = QLabel("—")
+        self.neighbor_next_text.setWordWrap(True)
+        next_box.addWidget(self.neighbor_next_title)
+        next_box.addWidget(self.neighbor_next_image)
+        next_box.addWidget(self.neighbor_next_text)
+
+        neighbors_layout.addLayout(prev_box)
+        neighbors_layout.addLayout(next_box)
+        transition_layout.addWidget(self.transition_neighbors_container)
+        self.transition_neighbors_container.hide()
         self.transition_panel.hide()
 
         evidence_group = QGroupBox("Evidence")
@@ -375,6 +412,12 @@ class VLMReviewWorkspace(QWidget):
     def _apply_blinding(self) -> None:
         # The final call is derived from day ordering; showing it would reintroduce sequence.
         self.prediction_form.setRowVisible(self.final_stage_label, not self._blinded)
+        if self._blinded:
+            self.neighbor_prev_image.clear()
+            self.neighbor_next_image.clear()
+            self.neighbor_prev_text.clear()
+            self.neighbor_next_text.clear()
+            self.transition_neighbors_container.hide()
         self.blind_status_label.setText(
             "Blinded — subject, day and sequence call hidden"
             if self._blinded
@@ -444,6 +487,81 @@ class VLMReviewWorkspace(QWidget):
             self.transition_secondary.setText(
                 f"Secondary: {prediction.secondary_stage.display_name if prediction.secondary_stage else '—'}"
             )
+            if not self._blinded and record.subject_id is not None and record.day is not None:
+                same_subject = [
+                    r
+                    for r in self.records
+                    if r.subject_id == record.subject_id
+                    and r.day is not None
+                    and r.sample_id != record.sample_id
+                ]
+                prev_records = [r for r in same_subject if float(r.day or 0) < float(record.day or 0)]
+                next_records = [r for r in same_subject if float(r.day or 0) > float(record.day or 0)]
+                prev_record = max(prev_records, key=lambda r: float(r.day or 0)) if prev_records else None
+                next_record = min(next_records, key=lambda r: float(r.day or 0)) if next_records else None
+
+                has_neighbor = False
+                if prev_record is not None:
+                    has_neighbor = True
+                    try:
+                        p_views = build_view_pack(prev_record.image_path)
+                        p_pix = _pixmap(p_views[0].image).scaled(
+                            140,
+                            100,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        self.neighbor_prev_image.setPixmap(p_pix)
+                    except Exception:
+                        self.neighbor_prev_image.setText("No Preview")
+                    stage_name = (
+                        prev_record.image_prediction.primary_stage.display_name
+                        if prev_record.image_prediction.primary_stage
+                        else "Ungradable"
+                    )
+                    self.neighbor_prev_text.setText(f"Day {prev_record.day}: {stage_name}")
+                else:
+                    self.neighbor_prev_image.clear()
+                    self.neighbor_prev_image.setText("None")
+                    self.neighbor_prev_text.setText("—")
+
+                if next_record is not None:
+                    has_neighbor = True
+                    try:
+                        n_views = build_view_pack(next_record.image_path)
+                        n_pix = _pixmap(n_views[0].image).scaled(
+                            140,
+                            100,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        self.neighbor_next_image.setPixmap(n_pix)
+                    except Exception:
+                        self.neighbor_next_image.setText("No Preview")
+                    stage_name = (
+                        next_record.image_prediction.primary_stage.display_name
+                        if next_record.image_prediction.primary_stage
+                        else "Ungradable"
+                    )
+                    self.neighbor_next_text.setText(f"Day {next_record.day}: {stage_name}")
+                else:
+                    self.neighbor_next_image.clear()
+                    self.neighbor_next_image.setText("None")
+                    self.neighbor_next_text.setText("—")
+
+                self.transition_neighbors_container.setVisible(has_neighbor)
+            else:
+                self.neighbor_prev_image.clear()
+                self.neighbor_next_image.clear()
+                self.neighbor_prev_text.clear()
+                self.neighbor_next_text.clear()
+                self.transition_neighbors_container.hide()
+        else:
+            self.neighbor_prev_image.clear()
+            self.neighbor_next_image.clear()
+            self.neighbor_prev_text.clear()
+            self.neighbor_next_text.clear()
+            self.transition_neighbors_container.hide()
 
     def review(self, action: str) -> None:
         record = self.current_record()

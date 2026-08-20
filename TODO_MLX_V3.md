@@ -87,8 +87,10 @@
 - [ ] Fit temperature calibration and temporal margin/gain thresholds on validation data only.
   The VLM's `raw_scores` are self-reported evidence values, not internal logits; validate empirically
   that temperature scaling improves held-in validation NLL/Brier before calling them calibrated.
-- [ ] Upgrade the transition adjudication panel from call summaries to true side-by-side neighboring
-  image comparison if reviewers need it during the blinded sequence pass.
+- [x] Upgrade the transition adjudication panel from call summaries to true side-by-side neighboring
+  image comparison for unblinded sequence review. Implemented in `cycles.gui.vlm_review` with
+  live slide thumbnails and stage labels for previous and next days while strictly preserving
+  blinding when `blinded=True`.
 
 ## P1 — freeze and evaluate
 
