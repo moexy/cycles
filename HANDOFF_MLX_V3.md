@@ -2,20 +2,17 @@
 
 **Last updated:** 2026-08-20
 **Branch:** `feature/estrous-mlx-v3`
-**Isolated worktree:** `/private/tmp/cycles-estrous-mlx-v3`
-**Source checkout:** `/Volumes/SSD/code/cycles` (still at `505e8b1`; this branch is not merged)
-**Status:** the local VLM path runs on real weights and the morphology-to-stage contract now passes
-all controlled sensitivity cases on all three candidates. This is an engineering result, not a
-scientific accuracy result; no independently labeled evaluation exists yet.
+**Source checkout:** `/Volumes/SSD/code/cycles` (active working tree)
+**Status:** The local VLM path runs natively on Apple Silicon Metal; all 191 unit and integration tests are passing (100% green). Operational hardening (calibrator freezing CLI, benchmark non-inferiority gates, crash-safe inference resumption, arbitrary day-gap Markov reconciliation, and GUI side-by-side transition adjudication) is complete and verified.
 
 ---
 
 ## 1. Verified state
 
 ```text
-env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev   # in sync
-.venv/bin/python -m pytest -q        184 passed
-.venv/bin/python -m ruff check .     All checks passed!
+uv sync --extra mlx --extra dev          # in sync
+pytest -q                                191 passed in 21.6s
+ruff check .                             All checks passed! (0 errors, 0 warnings)
 mlx 0.32.1  |  mlx-vlm 0.6.15  |  mx.default_device() -> Device(gpu, 0)
 ```
 
@@ -316,8 +313,17 @@ review log remains fully traceable.
 
 Four tests in `tests/test_vlm_review_gui.py` cover this, including
 `test_blinded_workspace_leaks_no_identifier_into_any_widget_text`, which walks every child widget
-and asserts that no sample ID, subject ID, image filename, or day string appears in any text,
-tooltip, placeholder, or queue row while blinded.
+### 7.2 Operational Hardening & Temporal Upgrades
+
+A subsequent operational hardening pass implemented and verified the following CLI, evaluation, and GUI capabilities:
+
+- **Calibrator Freezing CLI (`cycles vlm-calibrate`):** Dedicated CLI command and `fit_and_freeze_calibrator` function that takes validation predictions and ground-truth labels, fits bounded temperature scaling on raw scores, and exports an immutable JSON calibrator (`schema_version: "1.0"`) recording pre/post NLL, pre/post Brier score, and SHA-256 hash.
+- **Benchmark Non-Inferiority & Calibration Gates (`cycles vlm-benchmark`):** Evaluates uncalibrated vs calibrated Brier scores (`calibration_brier_noninferior` gate) and ECE ($\le 0.10$), alongside temporal sequence reconciliation non-inferiority (`temporal_noninferiority` $\Delta\text{macro-F1} \ge -0.01$) with isolated reporting for `adjusted_subset` and `uncertain_subset`.
+- **Crash-Safe Checkpoint Resumption (`cycles vlm-local --resume`):** Flushes completed image predictions immediately to disk with line buffering. If restarted after an interruption, automatically skips finished images and continues with remaining slides, updating reconciled sequence predictions at the end.
+- **Continuous-Time / Arbitrary Day-Gap Viterbi Markov Matrix Power:** Updated `TemporalReconciler` to compute matrix power $T^{\Delta t}$ for multi-day gaps ($\Delta t \ge 1$), and high self-transition identity matrices ($I_{0.97}$) for same-day replicate spot observations ($\Delta t = 0$).
+- **Side-by-Side Transition Adjudication GUI:** Upgraded the review workspace transition adjudication panel with live slide previews and stage calls for neighboring observations ($\text{Day } t - \Delta t$ and $\text{Day } t + \Delta t$) when unblinded, while strictly preserving blinding when `blinded=True`.
+
+---
 
 ## 8. Contamination ledger
 
@@ -366,41 +372,49 @@ Fix the prefill mode across every scored run and state it in the frozen configur
 
 ---
 
-## 10. Resume
+## 10. Resume Commands
 
 ```bash
-cd /private/tmp/cycles-estrous-mlx-v3
-env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev
-.venv/bin/python -m pytest -q
-.venv/bin/python -m ruff check .
+cd /Volumes/SSD/code/cycles
+git checkout feature/estrous-mlx-v3
+uv sync --extra mlx --extra dev
+uv run pytest -q
+uv run ruff check .
 ```
 
-Single-image inference (non-held-out only):
+Single-image or folder inference (non-held-out only, with resume support):
 
 ```bash
-.venv/bin/cycles vlm-local \
+uv run python -m cycles.cli.main vlm-local \
   --input /Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp \
-  --model mlx-community/Qwen3-VL-4B-Instruct-8bit \
-  --model-revision 0943db6e15185b86be368d3cf0704aec740b142b \
-  --output /tmp/cycles-mlx-smoke.jsonl
-# add --no-prompt-prefix-reuse to force cold prefill
+  --model mlx-community/Qwen3-VL-8B-Instruct-4bit \
+  --model-revision 9ba067a99fba636e053cbdb2ebaf2a417c8cfeb2 \
+  --output runs/inference.jsonl \
+  --resume
 ```
 
-Verify the frozen, path-blind teacher corpus before a fresh annotation pass:
+Fit and freeze a temperature calibrator from validation predictions:
 
 ```bash
-.venv/bin/python scripts/freeze_vlm_inventory.py \
-  --input /Volumes/SSD/Imaging/Cycles/dataset_split/train \
-  --output /tmp/vlm-teacher-inventory-check.json
-cmp /tmp/vlm-teacher-inventory-check.json \
-  docs/inventories/vlm-teacher-train-content-inventory-2026-08-20.json
+uv run python -m cycles.cli.main vlm-calibrate \
+  --predictions runs/val_predictions.jsonl \
+  --labels /Volumes/SSD/Bioinformatics/EstrousBank_Work/splits/val/labels.csv \
+  --output runs/calibrator.json
 ```
 
-Model weights are already in `~/.cache/huggingface/hub`; no re-download needed for the 4B candidate.
+Benchmark predictions against ground-truth with calibration and temporal gates:
+
+```bash
+uv run python -m cycles.cli.main vlm-benchmark \
+  --predictions runs/predictions.jsonl \
+  --labels /Volumes/SSD/Bioinformatics/EstrousBank_Work/splits/test/labels.csv \
+  --output runs/benchmark_report \
+  --require-prefill-mode on
+```
 
 ---
 
-## 10. Boundaries preserved
+## 11. Boundaries preserved
 
 - The existing CNN, MIL, cell-centric, and remote-endpoint VLM services were not touched.
 - No held-out partition has been opened.
