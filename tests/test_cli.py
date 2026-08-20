@@ -302,3 +302,81 @@ def test_main_reports_subcommand_errors(
 
     assert status == 1
     assert "cycles: error: missing weights" in capsys.readouterr().err
+
+
+def test_cycle_fit_reads_jsonl_input(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    jsonl_path = tmp_path / "predictions.jsonl"
+    jsonl_path.write_text(
+        json.dumps({
+            "sample_id": "d1",
+            "day": 1,
+            "subject_id": "m1",
+            "image_prediction": {"primary_stage": "diestrus"},
+            "sequence_prediction": {"final_stage": "diestrus"},
+        }) + "\n" +
+        json.dumps({
+            "sample_id": "d2",
+            "day": 2,
+            "subject_id": "m1",
+            "image_prediction": {"primary_stage": "proestrus"},
+            "sequence_prediction": {"final_stage": "proestrus"},
+        }) + "\n" +
+        json.dumps({
+            "sample_id": "d3",
+            "day": 3,
+            "subject_id": "m1",
+            "image_prediction": {"primary_stage": "estrus"},
+            "sequence_prediction": {"final_stage": "estrus"},
+        }) + "\n" +
+        json.dumps({
+            "sample_id": "d4",
+            "day": 4,
+            "subject_id": "m1",
+            "image_prediction": {"primary_stage": "metestrus"},
+            "sequence_prediction": {"final_stage": "metestrus"},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "fit.json"
+
+    status = cli.main(["cycle-fit", "--input", str(jsonl_path), "--output", str(output)])
+
+    assert status == 0
+    assert output.is_file()
+    fit_data = json.loads(output.read_text(encoding="utf-8"))
+    assert "regularity_score" in fit_data
+    assert "estimated_cycle_length_days" in fit_data
+
+
+def test_stage_subcommand_invokes_cell_centric_engine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "images"
+    folder.mkdir()
+    output = tmp_path / "stage_out.csv"
+    pipeline = MagicMock()
+    pipeline.process_folder.return_value = [object()]
+    factory = MagicMock(return_value=pipeline)
+    fake_module = ModuleType("cycles.stages.cell_centric")
+    fake_module.CellCentricPipeline = factory  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "cycles.stages.cell_centric", fake_module)
+
+    status = cli.main(
+        [
+            "stage",
+            "--input",
+            str(folder),
+            "--engine",
+            "cell-centric",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert status == 0
+    factory.assert_called_once_with(detector_mode="auto")
+    pipeline.process_folder.assert_called_once()
+    assert "Processed 1 image(s) via Cell-Centric morphometry" in capsys.readouterr().out
+

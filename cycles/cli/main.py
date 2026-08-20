@@ -141,6 +141,54 @@ def _first_value(row: dict[str, str], names: tuple[str, ...]) -> str | None:
     return None
 
 
+def _read_cycle_jsonl(path: Path, mouse_id: str | None = None) -> tuple[list[str], list[Any]]:
+    from cycles.core.types import EstrousStage
+
+    items: list[tuple[str, EstrousStage]] = []
+    with path.open(encoding="utf-8") as stream:
+        for _line_number, line in enumerate(stream, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            row_mouse_id = payload.get("subject_id")
+            if mouse_id is not None and row_mouse_id is not None and str(row_mouse_id) != str(mouse_id):
+                continue
+            seq = payload.get("sequence_prediction") or {}
+            img = payload.get("image_prediction") or {}
+            stage_val = seq.get("final_stage") or img.get("primary_stage")
+            if not stage_val:
+                continue
+            try:
+                stage = EstrousStage(stage_val)
+            except ValueError:
+                continue
+
+            day = payload.get("day")
+            if day is not None:
+                timestamp = _coerce_timestamp(str(day))
+            else:
+                timestamp = _timestamp_from_filename(payload.get("image_path") or payload.get("sample_id"))
+                if timestamp is None:
+                    timestamp = (datetime(1970, 1, 1) + timedelta(days=len(items))).isoformat()
+            items.append((timestamp, stage))
+
+    if not items:
+        raise ValueError(f"cycle input JSONL contains no valid observations: {path}")
+
+    items.sort(key=lambda x: x[0])
+    return [t for t, _ in items], [s for _, s in items]
+
+
+def _read_cycle_observations(path: Path, mouse_id: str | None = None) -> tuple[list[str], list[Any]]:
+    if path.suffix.lower() == ".jsonl":
+        return _read_cycle_jsonl(path, mouse_id=mouse_id)
+    return _read_cycle_csv(path, mouse_id=mouse_id)
+
+
 def _read_cycle_csv(path: Path, mouse_id: str | None = None) -> tuple[list[str], list[Any]]:
     from cycles.core.types import EstrousStage
 
@@ -266,7 +314,7 @@ def _write_cycle_plot(plot_data: dict[str, Any], output: Path) -> None:
 def _cmd_cycle_fit(args: argparse.Namespace) -> int:
     from cycles.core.cycle import fit_cyclicity, generate_cycle_plot_data
 
-    timestamps, stages = _read_cycle_csv(args.input, mouse_id=args.mouse_id)
+    timestamps, stages = _read_cycle_observations(args.input, mouse_id=args.mouse_id)
     fit = fit_cyclicity(timestamps, stages, mouse_id=args.mouse_id or "Mouse1")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if args.output.suffix.lower() == ".json":
@@ -418,6 +466,181 @@ def _read_vlm_sequence_manifest(path: Path) -> dict[Path, dict[str, Any]]:
     return rows
 
 
+DEFAULT_VLM_MODEL = "mlx-community/Qwen3-VL-8B-Instruct-4bit"
+PINNED_MODEL_REVISIONS: dict[str, str] = {
+    "mlx-community/Qwen3-VL-8B-Instruct-4bit": "9ba067a99fba636e053cbdb2ebaf2a417c8cfeb2",
+    "mlx-community/Qwen3-VL-4B-Instruct-8bit": "0943db6e15185b86be368d3cf0704aec740b142b",
+    "mlx-community/gemma-3-12b-it-4bit": "86cc6a8d799fa7e366052dc5e33bf7dc974e4776",
+}
+
+
+def _render_vlm_record_card(record: Any) -> str:
+    from cycles.core.types import EstrousStage
+
+    pred = getattr(record, "image_prediction", None)
+    morph = getattr(record, "morphology", None)
+    seq = getattr(record, "sequence_prediction", None)
+    if pred is None or morph is None or seq is None:
+        return ""
+
+    sample_id = getattr(record, "sample_id", "sample")
+    image_path = getattr(record, "image_path", "")
+    subject_id = getattr(record, "subject_id", None)
+    day = getattr(record, "day", None)
+
+    lines = []
+    lines.append("=" * 76)
+    sample_info = f"SAMPLE: {sample_id}"
+    if subject_id:
+        day_str = f", Day: {day}" if day is not None else ""
+        sample_info += f"  (Subject: {subject_id}{day_str})"
+    lines.append(sample_info)
+    lines.append(f"IMAGE:  {image_path}")
+
+    stage_str = pred.primary_stage.display_name.upper() if pred.primary_stage else "UNGRADABLE"
+    conf_str = pred.confidence_tier.value.upper()
+
+    if seq.adjusted and seq.final_stage:
+        lines.append(
+            f"STAGE:  {seq.final_stage.display_name.upper()}  "
+            f"[Reconciled by longitudinal sequence: {seq.reason}] (Single-Image: {stage_str})"
+        )
+    else:
+        lines.append(f"STAGE:  {stage_str}  (Confidence: {conf_str})")
+
+    if pred.probabilities:
+        lines.append("\nPHASE PROBABILITIES:")
+        for stage in (
+            EstrousStage.DIESTRUS,
+            EstrousStage.PROESTRUS,
+            EstrousStage.ESTRUS,
+            EstrousStage.METESTRUS,
+        ):
+            prob = pred.probabilities.get(stage, 0.0)
+            bar_len = int(round(prob * 30))
+            bar = "█" * bar_len + "░" * (30 - bar_len)
+            lines.append(f"  {stage.display_name:<10}: {prob*100:>5.1f}%  |{bar}|")
+
+    lines.append("\nCYTOMORPHOLOGY:")
+    lines.append(
+        f"  Leukocytes: {morph.leukocytes.value.upper():<9} | "
+        f"Cornified: {morph.cornified_squames.value.upper():<9} | "
+        f"Nucleated: {morph.nucleated_epithelial.value.upper():<9}"
+    )
+    lines.append(
+        f"  Nuclear:    {morph.nuclear_state.value:<9} | "
+        f"Layout:    {morph.arrangement.value:<9} | "
+        f"QC:        {morph.qc_status.value.upper()}"
+    )
+
+    if pred.rationale:
+        lines.append(f"\nRATIONALE:\n  {pred.rationale}")
+    lines.append("=" * 76)
+    return "\n".join(lines)
+
+
+def _render_vlm_summary_table(records: list[Any]) -> str:
+    from cycles.core.types import EstrousStage
+
+    if not records or not hasattr(records[0], "image_prediction"):
+        return ""
+
+    headers = (
+        f"{'Sample ID':<16} {'Assessed Stage':<14} {'Conf':<6} "
+        f"{'P(D)':<6} {'P(P)':<6} {'P(E)':<6} {'P(M)':<6} {'Leukocytes':<10} {'Cornified':<10}"
+    )
+    divider = "-" * len(headers)
+    rows = [headers, divider]
+    for r in records:
+        pred = getattr(r, "image_prediction", None)
+        seq = getattr(r, "sequence_prediction", None)
+        morph = getattr(r, "morphology", None)
+        sample_id = getattr(r, "sample_id", "sample")
+        if pred is None or seq is None or morph is None:
+            continue
+        final_stage = seq.final_stage or pred.primary_stage
+        stage_text = final_stage.display_name.upper() if final_stage else "UNGRADABLE"
+        if seq.adjusted:
+            stage_text += "*"
+        conf = pred.confidence_tier.value[:4].upper()
+        probs = pred.probabilities or {}
+        pd = f"{probs.get(EstrousStage.DIESTRUS, 0.0):.2f}"
+        pp = f"{probs.get(EstrousStage.PROESTRUS, 0.0):.2f}"
+        pe = f"{probs.get(EstrousStage.ESTRUS, 0.0):.2f}"
+        pm = f"{probs.get(EstrousStage.METESTRUS, 0.0):.2f}"
+        leuko = morph.leukocytes.value
+        corn = morph.cornified_squames.value
+        rows.append(
+            f"{sample_id[:15]:<16} {stage_text:<14} {conf:<6} "
+            f"{pd:<6} {pp:<6} {pe:<6} {pm:<6} {leuko:<10} {corn:<10}"
+        )
+    return "\n".join(rows)
+
+
+def _export_vlm_records_csv(records: list[Any], output_path: Path) -> None:
+    from cycles.core.types import EstrousStage
+
+    if not records or not hasattr(records[0], "image_prediction"):
+        return
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow([
+            "sample_id",
+            "image_path",
+            "subject_id",
+            "day",
+            "predicted_stage",
+            "secondary_stage",
+            "confidence_tier",
+            "p_diestrus",
+            "p_proestrus",
+            "p_estrus",
+            "p_metestrus",
+            "leukocytes",
+            "cornified_squames",
+            "nucleated_epithelial",
+            "nuclear_state",
+            "arrangement",
+            "qc_status",
+            "final_stage",
+            "adjusted",
+            "reason",
+            "rationale",
+        ])
+        for r in records:
+            pred = getattr(r, "image_prediction", None)
+            morph = getattr(r, "morphology", None)
+            seq = getattr(r, "sequence_prediction", None)
+            if pred is None or morph is None or seq is None:
+                continue
+            probs = pred.probabilities or {}
+            writer.writerow([
+                getattr(r, "sample_id", ""),
+                getattr(r, "image_path", ""),
+                getattr(r, "subject_id", "") or "",
+                getattr(r, "day", "") if getattr(r, "day", None) is not None else "",
+                pred.primary_stage.value if pred.primary_stage else "",
+                pred.secondary_stage.value if pred.secondary_stage else "",
+                pred.confidence_tier.value,
+                f"{probs.get(EstrousStage.DIESTRUS, 0.0):.4f}",
+                f"{probs.get(EstrousStage.PROESTRUS, 0.0):.4f}",
+                f"{probs.get(EstrousStage.ESTRUS, 0.0):.4f}",
+                f"{probs.get(EstrousStage.METESTRUS, 0.0):.4f}",
+                morph.leukocytes.value,
+                morph.cornified_squames.value,
+                morph.nucleated_epithelial.value,
+                morph.nuclear_state.value,
+                morph.arrangement.value,
+                morph.qc_status.value,
+                seq.final_stage.value if seq.final_stage else "",
+                seq.adjusted,
+                seq.reason,
+                pred.rationale,
+            ])
+
+
 def _cmd_vlm_local(args: argparse.Namespace) -> int:
     from cycles.vlm_local.schema import LocalVLMRecord
 
@@ -508,7 +731,121 @@ def _cmd_vlm_local(args: argparse.Namespace) -> int:
                 stream.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
         tmp_output.replace(args.output)
 
+    if getattr(args, "csv", None):
+        _export_vlm_records_csv(records, args.csv)
+        print(f"Exported tabular CSV to {args.csv}")
+
+    if len(records) == 1:
+        print(_render_vlm_record_card(records[0]))
+    elif len(records) > 1:
+        print(_render_vlm_summary_table(records))
+
     print(f"Classified {len(records)} image(s); wrote {args.output}")
+    return 0
+
+
+def _cmd_stage(args: argparse.Namespace) -> int:
+    if args.engine == "vlm":
+        model = args.model or DEFAULT_VLM_MODEL
+        revision = args.model_revision or PINNED_MODEL_REVISIONS.get(model)
+        if revision is None:
+            raise ValueError(f"--model-revision is required for custom model: {model}")
+        args.model = model
+        args.model_revision = revision
+        exit_code = _cmd_vlm_local(args)
+        if exit_code != 0:
+            return exit_code
+        if args.plot:
+            from cycles.core.cycle import fit_cyclicity, generate_cycle_plot_data
+
+            timestamps, stages = _read_cycle_jsonl(args.output)
+            if len(stages) >= 2:
+                _write_cycle_plot(generate_cycle_plot_data(timestamps, stages), args.plot)
+                fit = fit_cyclicity(timestamps, stages, mouse_id="Subject")
+                reg = fit.get("regularity_score", 0.0)
+                length = fit.get("cycle_length_days", 0.0)
+                print(
+                    f"Longitudinal cyclicity: Regularity={reg:.2f}, "
+                    f"Mean Period={length:.1f}d"
+                )
+                print(f"Generated timeline plot at {args.plot}")
+            else:
+                print(
+                    "Single image assessed; timeline plot skipped (requires >= 2 observations).",
+                    file=sys.stderr,
+                )
+        return 0
+
+    elif args.engine == "cell-centric":
+        from cycles.stages.cell_centric import CellCentricPipeline
+
+        pipeline = CellCentricPipeline(detector_mode=args.detector)
+        if args.input.is_dir():
+            results = pipeline.process_folder(
+                args.input,
+                save_overlays_dir=args.save_overlays,
+                recursive=False,
+                progress_callback=_progress,
+            )
+        else:
+            res = pipeline.process_image(args.input, save_overlay_path=args.save_overlays)
+            results = [res] if res else []
+        csv_out = (
+            args.csv
+            or (args.output if args.output.suffix == ".csv" else args.output.with_suffix(".csv"))
+        )
+        pipeline.export_results_csv(results, csv_out)
+        print(f"Processed {len(results)} image(s) via Cell-Centric morphometry; wrote {csv_out}")
+        if args.plot:
+            from cycles.core.cycle import fit_cyclicity, generate_cycle_plot_data
+
+            timestamps, stages = _read_cycle_csv(csv_out)
+            if len(stages) >= 2:
+                _write_cycle_plot(generate_cycle_plot_data(timestamps, stages), args.plot)
+                print(f"Generated timeline plot at {args.plot}")
+        return 0
+
+    elif args.engine == "cnn":
+        model_spec = args.model or "runs/resnet50_estrousbank_finetuned.pt"
+        service = _build_cnn_service(model_spec, _device(args.device))
+        if args.input.is_dir():
+            result = service.classify_folder(args.input, progress_callback=_progress)
+        else:
+            res = service.classify_image(args.input)
+            from cycles.stages.cnn import BatchClassificationResult
+
+            result = BatchClassificationResult(
+                [res], Path(args.input).parent, datetime.now().isoformat(), "resnet50"
+            )
+        csv_out = (
+            args.csv
+            or (args.output if args.output.suffix == ".csv" else args.output.with_suffix(".csv"))
+        )
+        service.export_results_csv(result, csv_out)
+        print(f"Classified {len(result.results)} image(s) via CNN; wrote {csv_out}")
+        if args.plot:
+            from cycles.core.cycle import fit_cyclicity, generate_cycle_plot_data
+
+            timestamps, stages = _read_cycle_csv(csv_out)
+            if len(stages) >= 2:
+                _write_cycle_plot(generate_cycle_plot_data(timestamps, stages), args.plot)
+                print(f"Generated timeline plot at {args.plot}")
+        return 0
+
+    elif args.engine == "mil":
+        from cycles.stages.mil import AttentionMILPipeline
+
+        pipeline = AttentionMILPipeline()
+        folder = args.input if args.input.is_dir() else args.input.parent
+        result = pipeline.process_folder(folder, save_heatmaps_dir=args.save_heatmaps)
+        csv_out = (
+            args.csv
+            or (args.output if args.output.suffix == ".csv" else args.output.with_suffix(".csv"))
+        )
+        pipeline.export_results_csv(result, csv_out)
+        print(f"Processed {len(result.results)} image(s) via Attention-MIL; wrote {csv_out}")
+        return 0
+
     return 0
 
 
@@ -567,6 +904,57 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    stage = subparsers.add_parser(
+        "stage", help="Unified end-to-end automated estrous cycle phase assessment"
+    )
+    stage.add_argument(
+        "--input",
+        type=_existing_path,
+        required=True,
+        help="Path to cytology image or directory of images",
+    )
+    stage.add_argument(
+        "--engine",
+        choices=("vlm", "cell-centric", "cnn", "mil"),
+        default="vlm",
+        help="Analysis engine (default: vlm)",
+    )
+    stage.add_argument(
+        "--output",
+        type=Path,
+        default=Path("runs/staging_results.jsonl"),
+        help="Output JSONL or CSV file path",
+    )
+    stage.add_argument("--csv", type=Path, help="Optional path to export tabular CSV results")
+    stage.add_argument("--plot", type=Path, help="Optional path to generate timeline plot PNG")
+    stage.add_argument("--model", help="Model checkpoint path or HuggingFace ID")
+    stage.add_argument("--model-revision", help="Hugging Face model commit SHA")
+    stage.add_argument("--adapter", type=Path, help="Fine-tuned LoRA adapter path")
+    stage.add_argument("--calibrator", type=_existing_file, help="Temperature calibrator JSON")
+    stage.add_argument("--sequence-manifest", type=_existing_file)
+    stage.add_argument("--margin-threshold", type=float, default=0.15)
+    stage.add_argument("--adjustment-threshold", type=float, default=0.0)
+    stage.add_argument(
+        "--no-prompt-prefix-reuse",
+        action="store_true",
+        help="Cold-prefill every pass instead of reusing prefix",
+    )
+    stage.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume interrupted inference by skipping completed samples",
+    )
+    stage.add_argument(
+        "--detector",
+        choices=("auto", "yolo", "morphometry"),
+        default="auto",
+        help="Detector mode for cell-centric engine",
+    )
+    stage.add_argument("--save-overlays", type=Path, help="Directory to save cell overlays")
+    stage.add_argument("--save-heatmaps", type=Path, help="Directory to save MIL attention heatmaps")
+    stage.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
+    stage.set_defaults(func=_cmd_stage)
+
     classify = subparsers.add_parser("classify", help="Run classical CNN staging")
     classify.add_argument("--folder", type=_existing_directory, required=True)
     classify.add_argument("--model", required=True, help="Checkpoint path or backbone architecture")
@@ -620,6 +1008,7 @@ def build_parser() -> argparse.ArgumentParser:
     vlm_local.add_argument("--input", type=_existing_path, required=True)
     vlm_local.add_argument("--model", required=True)
     vlm_local.add_argument("--output", type=Path, required=True)
+    vlm_local.add_argument("--csv", type=Path, help="Optional path to export tabular CSV results")
     vlm_local.add_argument("--adapter", type=Path)
     vlm_local.add_argument(
         "--model-revision",

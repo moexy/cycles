@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,6 +12,69 @@ from PIL import Image
 import cycles.cli.main as cli
 
 REVISION = "a" * 40
+
+
+def _dummy_record(image_path: Path) -> Any:
+    from cycles.core.types import EstrousStage
+    from cycles.vlm_local.schema import (
+        Abundance,
+        Arrangement,
+        ConfidenceTier,
+        ImagePrediction,
+        LocalVLMRecord,
+        MorphologyObservation,
+        NuclearState,
+        QCStatus,
+        SequencePrediction,
+    )
+
+    morph = MorphologyObservation(
+        cornified_squames=Abundance.DOMINANT,
+        nucleated_epithelial=Abundance.ABSENT,
+        leukocytes=Abundance.ABSENT,
+        nuclear_state=NuclearState.CLEAR_NUCLEI,
+        arrangement=Arrangement.SHEETS,
+        artifacts=(),
+        qc_status=QCStatus.USABLE,
+        qc_reasons=(),
+        evidence=("Cornified squames visible",),
+    )
+    probs = {
+        EstrousStage.DIESTRUS: 0.05,
+        EstrousStage.PROESTRUS: 0.05,
+        EstrousStage.ESTRUS: 0.85,
+        EstrousStage.METESTRUS: 0.05,
+    }
+    raw = {
+        EstrousStage.DIESTRUS: 0.0,
+        EstrousStage.PROESTRUS: 0.0,
+        EstrousStage.ESTRUS: 3.0,
+        EstrousStage.METESTRUS: 0.0,
+    }
+    pred = ImagePrediction(
+        primary_stage=EstrousStage.ESTRUS,
+        secondary_stage=None,
+        raw_scores=raw,
+        probabilities=probs,
+        confidence_tier=ConfidenceTier.HIGH,
+        rationale="Dense cornified sheets indicate estrus",
+    )
+    seq = SequencePrediction(
+        final_stage=EstrousStage.ESTRUS,
+        adjusted=False,
+        reason="image_only",
+    )
+    return LocalVLMRecord(
+        sample_id=image_path.stem,
+        image_path=str(image_path.resolve()),
+        image_sha256="0" * 64,
+        subject_id="mouse-1",
+        day=3.0,
+        morphology=morph,
+        image_prediction=pred,
+        sequence_prediction=seq,
+        provenance={"prompt_version": "v3", "schema_version": "3.0"},
+    )
 
 
 def test_parser_recognizes_local_vlm_commands(tmp_path: Path) -> None:
@@ -217,4 +281,67 @@ def test_vlm_local_resume_skips_existing_records(tmp_path: Path, monkeypatch) ->
     lines = [json.loads(line) for line in output.read_text().splitlines() if line.strip()]
     assert len(lines) == 2
     assert {row["sample_id"] for row in lines} == {"img1", "img2"}
+
+
+def test_vlm_local_exports_csv_and_prints_record_card(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    image = tmp_path / "slide.png"
+    Image.new("RGB", (8, 8)).save(image)
+    output = tmp_path / "out.jsonl"
+    csv_out = tmp_path / "out.csv"
+
+    record = _dummy_record(image)
+    pipeline = MagicMock()
+    pipeline.classify_image.return_value = record
+    monkeypatch.setattr(cli, "_build_local_vlm_pipeline", lambda *args, **kwargs: pipeline)
+
+    status = cli.main([
+        "vlm-local",
+        "--input", str(image),
+        "--model", "test/model",
+        "--model-revision", REVISION,
+        "--output", str(output),
+        "--csv", str(csv_out),
+    ])
+
+    assert status == 0
+    assert output.is_file()
+    assert csv_out.is_file()
+    csv_content = csv_out.read_text(encoding="utf-8")
+    assert "sample_id" in csv_content
+    assert "p_diestrus" in csv_content
+
+    stdout = capsys.readouterr().out
+    assert "SAMPLE:" in stdout
+    assert "STAGE:  ESTRUS" in stdout
+    assert "PHASE PROBABILITIES:" in stdout
+    assert "CYTOMORPHOLOGY:" in stdout
+
+
+def test_stage_command_with_vlm_engine_uses_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    image = tmp_path / "slide.png"
+    Image.new("RGB", (8, 8)).save(image)
+    output = tmp_path / "stage_vlm.jsonl"
+
+    record = _dummy_record(image)
+    pipeline = MagicMock()
+    pipeline.classify_image.return_value = record
+    builder = MagicMock(return_value=pipeline)
+    monkeypatch.setattr(cli, "_build_local_vlm_pipeline", builder)
+
+    status = cli.main([
+        "stage",
+        "--input", str(image),
+        "--output", str(output),
+    ])
+
+    assert status == 0
+    assert output.is_file()
+    # Check default model and revision were passed
+    assert builder.call_args[0][0] == cli.DEFAULT_VLM_MODEL
+    assert builder.call_args[0][2] == cli.PINNED_MODEL_REVISIONS[cli.DEFAULT_VLM_MODEL]
+
 
