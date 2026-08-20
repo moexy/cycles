@@ -14,7 +14,7 @@ scientific accuracy result; no independently labeled evaluation exists yet.
 
 ```text
 env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev   # in sync
-.venv/bin/python -m pytest -q        173 passed
+.venv/bin/python -m pytest -q        179 passed
 .venv/bin/python -m ruff check .     All checks passed!
 mlx 0.32.1  |  mlx-vlm 0.6.15  |  mx.default_device() -> Device(gpu, 0)
 ```
@@ -241,6 +241,31 @@ A later review reproduced and fixed additional paths that could silently corrupt
 
 These are engineering validations. They do not substitute for an independent teacher reference.
 
+### 7.1 Blinded review mode
+
+The review workspace previously displayed `record.sample_id` in both the queue and the image
+heading, and `record.day` in the queue, which would have leaked subject and day into a supposedly
+stage-blind annotation pass. `VLMReviewWorkspace` now takes `blinded: bool = True` and defaults to
+blinded, so an annotator who never touches the toggle is still protected.
+
+While blinded:
+
+- the queue row and image heading read `Sample NNN`, an opaque display position;
+- `record.day` is not rendered anywhere;
+- the sequence-derived **Final call** row is hidden, because it is computed from day ordering and
+  would reintroduce the sequence the protocol defers;
+- the queue is ordered by `image_sha256`, not by acquisition order, so consecutive days of one
+  subject are not presented adjacently. The ordering is deterministic across runs.
+
+Identity is revealed only by an explicit toolbar checkbox, and the toolbar states the current mode.
+Blinding is a display concern only: `AnnotationStore` still logs the true `sample_id`, so the
+review log remains fully traceable.
+
+Four tests in `tests/test_vlm_review_gui.py` cover this, including
+`test_blinded_workspace_leaks_no_identifier_into_any_widget_text`, which walks every child widget
+and asserts that no sample ID, subject ID, image filename, or day string appears in any text,
+tooltip, placeholder, or queue row while blinded.
+
 ## 8. Contamination ledger
 
 The annotation protocol requires a genuinely stage-blind teacher pass. The historical claims below
@@ -275,9 +300,8 @@ See [`TODO_MLX_V3.md`](TODO_MLX_V3.md) for the full list. Ordered by what blocks
    path-blind 343-image inventory and match aggregate SHA-256
    `6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f`. Then complete the image-only
    pass, hash the log, and only then expose subject/day ordering for the 141 longitudinal images.
-   **Do not use the current review UI unchanged:** static audit shows its queue displays
-   `record.sample_id` and `record.day`, and its image heading displays `record.sample_id`. Implement
-   and verify a blinded display mode first. Nothing downstream is valid without this.
+   The review UI is now blinded by default (section 7.1); confirm `workspace.blinded` is `True`
+   and that the toolbar reads `Blinded` before the first image is displayed.
 2. **Rerun a small labeled, non-held-out real-image comparison under prompt v3** before a full
    bakeoff. The controlled probe proves contract compliance only.
 3. **Freeze the prefill mode and measurement protocol** before any scored multi-model run; the

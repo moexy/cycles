@@ -4,9 +4,13 @@
 
 - [ ] Start a fresh restricted annotation session with access only to
   `/Volumes/SSD/Imaging/Cycles/dataset_split/train`; deny access to all legacy stage metadata.
-- [ ] Add and verify a blinded image-only mode before that session. Static audit shows the current
-  review queue and image heading display `record.sample_id`, and the queue also displays `record.day`.
-  A fresh context alone does not prevent subject/day leakage through the UI.
+- [x] Add and verify a blinded image-only mode before that session. `VLMReviewWorkspace` is now
+  blinded by default: the queue and image heading show an opaque `Sample NNN` position instead of
+  `record.sample_id`, the queue no longer shows `record.day`, the day-derived sequence call is
+  hidden, and the queue is ordered by image content hash so subjects are not presented in day
+  order. A toolbar checkbox reveals identity deliberately. Verified by four tests, including a
+  sweep asserting that no sample ID, subject ID, image filename, or day string reaches any widget
+  text while blinded.
 - [x] Create and freeze a path-blind content inventory of all 343 teacher images. Artifact:
   `docs/inventories/vlm-teacher-train-content-inventory-2026-08-20.json`; aggregate SHA-256
   `6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f`; 168,804,058 bytes and no

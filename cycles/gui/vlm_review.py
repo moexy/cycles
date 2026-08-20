@@ -10,6 +10,7 @@ from PIL import Image
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QAction, QImage, QPixmap, QResizeEvent, QWheelEvent
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -83,14 +84,20 @@ class VLMReviewWorkspace(QWidget):
         self,
         *,
         reviewer_id: str = "local-reviewer",
+        blinded: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.reviewer_id = reviewer_id
         self.records: list[LocalVLMRecord] = []
         self.annotation_store: AnnotationStore | None = None
+        # Blinded by default: an annotator who forgets the toggle is still protected.
+        self._blinded = bool(blinded)
+        self._display_order: list[int] = []
+        self._display_number: dict[int, int] = {}
         self._build_ui()
         self._build_shortcuts()
+        self._apply_blinding()
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
@@ -101,9 +108,16 @@ class VLMReviewWorkspace(QWidget):
         self.export_button.clicked.connect(self._choose_export)
         self.export_button.setEnabled(False)
         self.summary_label = QLabel("No v3 predictions loaded")
+        self.blind_checkbox = QCheckBox("Blinded")
+        self.blind_checkbox.setChecked(self._blinded)
+        self.blind_checkbox.toggled.connect(self._on_blind_toggled)
+        self.blind_status_label = QLabel()
+        self.blind_status_label.setObjectName("blindStatus")
         toolbar.addWidget(self.load_button)
         toolbar.addWidget(self.export_button)
         toolbar.addWidget(self.summary_label, 1)
+        toolbar.addWidget(self.blind_status_label)
+        toolbar.addWidget(self.blind_checkbox)
         outer.addLayout(toolbar)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -180,6 +194,7 @@ class VLMReviewWorkspace(QWidget):
 
         prediction_group = QGroupBox("Stage assessment")
         prediction_form = QFormLayout(prediction_group)
+        self.prediction_form = prediction_form
         self.primary_stage_combo = _stage_combo(optional=False)
         self.secondary_stage_combo = _stage_combo(optional=True)
         self.confidence_combo = _enum_combo(ConfidenceTier)
@@ -255,6 +270,7 @@ class VLMReviewWorkspace(QWidget):
     ) -> None:
         self.records = list(records)
         self.annotation_store = annotation_store
+        self._recompute_display_order()
         self.export_button.setEnabled(bool(records))
         self.summary_label.setText(
             f"{len(records)} prediction(s) · reviews: {annotation_store.path.name}"
@@ -301,14 +317,13 @@ class VLMReviewWorkspace(QWidget):
         current_sample = self.current_record().sample_id if self.current_record() else None
         self.queue_list.clear()
         selected_row = 0
-        for record_index, record in enumerate(self.records):
+        for record_index in self._display_order:
+            record = self.records[record_index]
             event = latest.get(record.sample_id)
             status = event.action if event else "pending"
             if selected_filter != "all" and status != selected_filter:
                 continue
-            item = QListWidgetItem(
-                f"{record.sample_id} · day {record.day if record.day is not None else '—'}  [{_status_label(status)}]"
-            )
+            item = QListWidgetItem(self._queue_label(record_index, record, status))
             item.setData(Qt.ItemDataRole.UserRole, record_index)
             self.queue_list.addItem(item)
             if record.sample_id == current_sample:
@@ -316,21 +331,76 @@ class VLMReviewWorkspace(QWidget):
         if self.queue_list.count():
             self.queue_list.setCurrentRow(selected_row)
 
-    def current_record(self) -> LocalVLMRecord | None:
+    def _current_record_index(self) -> int | None:
         item = self.queue_list.currentItem()
         if item is None:
             return None
         index = item.data(Qt.ItemDataRole.UserRole)
-        return self.records[int(index)] if index is not None else None
+        return int(index) if index is not None else None
+
+    def current_record(self) -> LocalVLMRecord | None:
+        index = self._current_record_index()
+        return self.records[index] if index is not None else None
+
+    @property
+    def blinded(self) -> bool:
+        return self._blinded
+
+    def set_blinded(self, blinded: bool) -> None:
+        """Hide or reveal subject identity, day, and the sequence-derived call."""
+        blinded = bool(blinded)
+        if blinded == self._blinded:
+            return
+        self._blinded = blinded
+        if self.blind_checkbox.isChecked() != blinded:
+            self.blind_checkbox.setChecked(blinded)
+        self._recompute_display_order()
+        self._apply_blinding()
+        self._refresh_queue()
+        self._display_current(self.queue_list.currentRow())
+
+    @Slot(bool)
+    def _on_blind_toggled(self, checked: bool) -> None:
+        self.set_blinded(checked)
+
+    def _recompute_display_order(self) -> None:
+        # Blinded review must not present subjects in day order, so sort by image
+        # content hash: deterministic across runs and independent of acquisition order.
+        indices = list(range(len(self.records)))
+        if self._blinded:
+            indices.sort(key=lambda index: (self.records[index].image_sha256, self.records[index].sample_id))
+        self._display_order = indices
+        self._display_number = {index: position for position, index in enumerate(indices, start=1)}
+
+    def _apply_blinding(self) -> None:
+        # The final call is derived from day ordering; showing it would reintroduce sequence.
+        self.prediction_form.setRowVisible(self.final_stage_label, not self._blinded)
+        self.blind_status_label.setText(
+            "Blinded — subject, day and sequence call hidden"
+            if self._blinded
+            else "IDENTIFIED — subject and day are visible"
+        )
+
+    def _queue_label(self, record_index: int, record: LocalVLMRecord, status: str) -> str:
+        if self._blinded:
+            return f"Sample {self._display_number[record_index]:03d}  [{_status_label(status)}]"
+        day = record.day if record.day is not None else "—"
+        return f"{record.sample_id} · day {day}  [{_status_label(status)}]"
+
+    def _heading_text(self, record_index: int, record: LocalVLMRecord) -> str:
+        if self._blinded:
+            return f"Sample {self._display_number[record_index]:03d} — whole field"
+        return f"{record.sample_id} — whole field"
 
     @Slot(int)
     def _display_current(self, _row: int) -> None:
-        record = self.current_record()
-        if record is None:
+        record_index = self._current_record_index()
+        if record_index is None:
             return
+        record = self.records[record_index]
         views = build_view_pack(record.image_path)
         self.overview_view.set_pil_image(views[0].image)
-        self.image_heading.setText(f"{record.sample_id} — whole field")
+        self.image_heading.setText(self._heading_text(record_index, record))
         for label, view in zip(self.tile_labels, views[1:], strict=True):
             pixmap = _pixmap(view.image).scaled(
                 180,
