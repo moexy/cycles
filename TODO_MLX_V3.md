@@ -8,8 +8,14 @@
 - [ ] Complete the image-only morphology/stage/uncertainty pass and hash the annotation log.
 - [ ] Expose subject/day ordering only after that freeze and complete the second sequence pass for
   the 141 longitudinal images.
-- [ ] Run one native-Metal, non-held-out inference smoke test for each candidate model and verify the
-  installed MLX-VLM API, JSON repair path, memory accounting, and provenance.
+- [x] Run one native-Metal, non-held-out inference smoke test and verify the installed MLX-VLM API,
+  JSON repair path, memory accounting, and provenance. Done 2026-08-20 for Qwen3-VL 4B 8-bit; it
+  found three real defects, fixed in `e7e6521`. Peak 6.95 GiB, 59 s/image.
+- [ ] Repeat the smoke test for the two remaining candidates (Qwen3-VL 8B 4-bit, Gemma 3 12B 4-bit)
+  before the bakeoff, confirming peak allocation stays under 36 GiB at the larger sizes.
+- [ ] Decide whether 59 s/image is acceptable. A single pass over the 343 teacher images is ~5.6 h on
+  the smallest candidate, and the bakeoff runs three models; consider reducing the view pack or
+  batching before committing to the full matrix.
 
 ## P1 — select and train
 

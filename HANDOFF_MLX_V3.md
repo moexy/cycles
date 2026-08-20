@@ -4,14 +4,14 @@
 **Branch:** `feature/estrous-mlx-v3`  
 **Isolated worktree:** `/tmp/cycles-estrous-mlx-v3`  
 **Source checkout:** `/Volumes/SSD/code/cycles`  
-**Status:** implementation foundation complete; scientific annotation, model training, and held-out
-validation remain.
+**Status:** implementation foundation complete and now verified against real weights on Metal;
+scientific annotation, model training, and held-out validation remain.
 
 ## Verified state
 
 ```text
 .venv/bin/python -m pytest -q
-134 passed in 21.88s
+138 passed in 5.47s
 
 .venv/bin/python -m ruff check .
 All checks passed!
@@ -24,16 +24,47 @@ mlx==0.32.1
 mlx-vlm==0.6.15
 ```
 
-`mlx_vlm` reaches MLX initialization, but this headless sandbox has no Metal device and raises:
+**Superseded on 2026-08-20.** The original session ran in a headless sandbox with no Metal device
+and could only inspect the installed 0.6.15 source, so it made no claim that inference had run. A
+later session on a Metal-capable machine ran the smoke test and found that the code did not work.
+Three defects were fixed in `e7e6521`:
+
+1. `generate()` does not apply the chat template. The prompt reached the model with no image
+   placeholder tokens, so `get_input_embeddings` tried to scatter a 22,097,920-element vision
+   embedding into an empty position set and raised
+   `[broadcast_shapes] Shapes (22097920) and (0) cannot be broadcast`. The backend now calls
+   `apply_chat_template` with one placeholder per materialized view.
+2. `ImagePrediction.from_dict` required `secondary_stage` to equal `ranked[1]` of the probabilities
+   sorted by key. A confident model emits a one-hot distribution whose three zero-probability stages
+   tie, so the occupant of that slot was an arbitrary artifact of dict ordering that no model could
+   be asked to guess. Every confident prediction was rejected as `invalid_model_output`, including
+   after the repair pass. Validation now compares probability values, so ties pass and genuine rank
+   violations still fail.
+3. The backend boundary test asserted the raw prompt reached `generate()` unchanged — encoding
+   defect 1 as expected behavior, against a fake `mlx_vlm` written to match the code rather than the
+   library. This is why 134 tests passed over broken inference. The fake now mirrors the real calling
+   contract and fails the way the model does.
+
+The lesson worth carrying forward: a hand-written fake of an unexecuted dependency proves only
+self-consistency. Source inspection is not execution.
+
+Verified end to end on one non-held-out training image
+(`dataset_split/train/batch_1/mouse3/mouse3D1.webp`, sha256 `f53bd055…`):
 
 ```text
-RuntimeError: [metal::load_device] No Metal device available.
+qc_status         usable
+primary_stage     metestrus   (secondary diestrus, confidence medium)
+model load         3.61 s
+peak after load    4.756 GiB
+inference          59.03 s / image   (five views, two passes)
+peak overall       6.949 GiB         (budget 36 GiB)
 ```
 
-Therefore no claim is made that real model inference has run here. The installed 0.6.15 source was
-inspected to verify that `load()` accepts `adapter_path` and `revision`, while `generate()` accepts
-image paths rather than PIL objects. The backend now materializes deterministic views as temporary
-lossless PNGs and deletes them after each call; this behavior has a passing API-boundary test.
+The stage above is a model output on a training image, not a validated result, and carries no
+evidentiary weight for accuracy. It shows only that the path runs and emits a schema-valid record.
+
+Latency is worth noting before the bakeoff: 59 s/image on the smallest candidate implies roughly
+5.6 hours for a single pass over the 343 teacher images, and the 8B/12B candidates will be slower.
 
 ## What is implemented
 
@@ -75,7 +106,7 @@ env UV_CACHE_DIR=/tmp/cycles-uv-cache uv sync --extra mlx --extra dev
 .venv/bin/python -m ruff check .
 ```
 
-For a native Metal smoke test, run from a normal macOS terminal rather than the headless sandbox:
+The native Metal smoke test below has been run and passes; rerun it after any backend change:
 
 ```bash
 cycles vlm-local --input /path/to/one/non-held-out-slide.png \
