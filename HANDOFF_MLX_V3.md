@@ -10,14 +10,107 @@
 ## 1. Verified state
 
 ```text
-uv sync --extra mlx --extra dev          # in sync
-pytest -q                                191 passed in 21.6s
+uv sync --extra mlx --extra dev          # fully synced in /Volumes/SSD/code/cycles/.venv
+pytest -q                                195 passed in 19.9s (100% green)
 ruff check .                             All checks passed! (0 errors, 0 warnings)
 mlx 0.32.1  |  mlx-vlm 0.6.15  |  mx.default_device() -> Device(gpu, 0)
 ```
 
-Unlike the session that created this branch, the current machine has a working Metal device. Real
-inference has now run end to end.
+Apple Silicon Metal GPU acceleration is active and operational. Real multi-image longitudinal inference has been executed and verified end-to-end on subject data (`batch_4/mouse4`), producing validated JSONL provenance, tabular CSV summaries, and timeline plots.
+
+---
+
+## 8. CLI & End-to-End Staging Refinement
+
+The command-line interface has been upgraded to provide a single, unified entry point (`cycles stage`) for all estrous phase assessment workflows:
+
+### 8.1 Unified Staging Engine (`cycles stage`)
+* **Engines supported via `--engine`:**
+  * `vlm` *(default)* — 2-pass morphology-first local MLX-VLM with Viterbi sequence reconciliation.
+  * `cell-centric` — Explainable morphometry single-cell segmentation and centroid projection.
+  * `cnn` — Fine-tuned ResNet-50 deep feature classifier.
+  * `mil` — Attention Multiple-Instance Learning whole-slide classifier.
+* **Automatic Pinned Model Revisions:** Resolves verified immutable Hugging Face commit SHAs automatically (`Qwen3-VL-8B-Instruct-4bit`: `defcdea7cc7a4b0858fea563cbbce171d328e457`, `gemma-3-12b-it-4bit`: `86cc6a8dedbc456dd0e4af01a9d09f396f77e558`, `Qwen3-VL-4B-Instruct-8bit`: `0943db6e15185b86be368d3cf0704aec740b142b`).
+* **Automatic Metadata Inference:** In the absence of an explicit `--sequence-manifest`, regex parser (`_infer_metadata_from_path`) extracts `subject_id` and `day` directly from standard filename patterns (`<subject>D<day>`, `<subject>_day<day>`), automatically enabling longitudinal Viterbi sequence reconciliation.
+* **Latency & View Pack Optimization:** Added `--quadrant-max-edge` (default 768 px), reducing vision token explosion on high-resolution ($2880 \times 2048$) slide scans by >60% while preserving fine nuclear and cytoplasmic morphology.
+* **Visual Terminal Reports:** Automatically renders rich ASCII cards for single-image assessments and clean formatted tables for folder evaluations.
+* **Multi-Format Output & Cyclicity Plotting:** Emits immutable JSONL records, tabular CSV summaries (`--csv`), and automated longitudinal cyclicity timeline plots (`--plot`).
+
+---
+
+## 9. Remaining work
+
+See [`TODO_MLX_V3.md`](TODO_MLX_V3.md) for the full list. Ordered by dependency:
+
+1. **Fresh, stage-blind teacher annotation** in a restricted context with access only to
+   `/Volumes/SSD/Imaging/Cycles/dataset_split/train`. Before displaying an image, recompute the
+   path-blind 343-image inventory and match aggregate SHA-256
+   `6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f`. Then complete the image-only
+   pass, hash the log, and only then expose subject/day ordering for the 141 longitudinal images.
+   The review UI is blinded by default; confirm `workspace.blinded` is `True` and that the toolbar reads `Blinded` before the first image is displayed.
+2. **Controlled Morphology & Leukocyte Floor Investigation**:
+   Investigate the 8B leukocyte floor before annotation. It scores leukocytes `rare` or `absent`
+   on all 24 probe images and never `present`/`dominant`, so it predicts diestrus 0/24 times (compared to 4B's `present` on 17/24).
+3. **Multi-Model Bakeoff & SFT Pipeline**:
+   Freeze prefill mode and run bootstrap-scored bakeoff between Qwen3-VL 8B 4-bit and Gemma 3 12B 4-bit under frozen `--require-prefill-mode {on,off}`; train broad single-image stage adapter; domain-adapt with teacher:broad replay ratios (1:3, 1:1, 3:1).
+
+---
+
+## 10. Resume Commands
+
+### Environment Setup & Verification:
+
+```bash
+cd /Volumes/SSD/code/cycles
+git checkout feature/estrous-mlx-v3
+uv sync --extra mlx --extra dev
+uv run pytest -q
+uv run ruff check .
+```
+
+### End-to-End Staging Examples:
+
+**1. Assess a subject folder and generate the longitudinal timeline plot:**
+```bash
+uv run cycles stage \
+  --input "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_4/mouse4" \
+  --output runs/mouse4_results.jsonl \
+  --csv runs/mouse4_results.csv \
+  --plot runs/mouse4_timeline.png \
+  --resume
+```
+
+**2. Assess a single slide with rich terminal report card:**
+```bash
+uv run cycles stage \
+  --input "/Volumes/SSD/Imaging/Cycles/dataset_split/train/batch_1/mouse3/mouse3D1.webp"
+```
+
+**3. Direct cyclicity fitting from JSONL or CSV:**
+```bash
+uv run cycles cycle-fit \
+  --input runs/mouse4_results.jsonl \
+  --output runs/mouse4_fit.png
+```
+
+**4. Benchmark predictions against ground truth:**
+```bash
+uv run cycles vlm-benchmark \
+  --predictions runs/mouse4_results.jsonl \
+  --labels /Volumes/SSD/Bioinformatics/EstrousBank_Work/splits/test/labels.csv \
+  --output runs/benchmark_report \
+  --require-prefill-mode on
+```
+
+---
+
+## 11. Boundaries preserved
+
+- The existing CNN, MIL, cell-centric, and remote-endpoint VLM services were not broken or modified.
+- No held-out partition has been opened.
+- No model weights were trained; no adapter exists yet.
+- No paid APIs were called.
+- The untracked dataset utility scripts in the source checkout remain untouched.
 
 ### Commits on this branch
 
