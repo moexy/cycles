@@ -1,0 +1,794 @@
+[
+  {
+    "image": "BulkRNA staging images/090426/sample_01254754.webp",
+    "full": {
+      "wall": 18.166109333003988,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.017263665999053,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "BulkRNA staging images/100426/sample_3ef38d9b.webp",
+    "full": {
+      "wall": 19.971269124987884,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 15.242119583010208,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "BulkRNA staging images/130426/sample_578a6218.webp",
+    "full": {
+      "wall": 21.63359870800923,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.90515045900247,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/05032026/sample_1b29c359.webp",
+    "full": {
+      "wall": 20.89856695898925,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.562213499986683,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/05032026/sample_e5f7a845.webp",
+    "full": {
+      "wall": 25.989899124993826,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 17.069999667000957,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/06032026/sample_ea790a5d.webp",
+    "full": {
+      "wall": 31.132837958008167,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 17.968745874997694,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/09032026/sample_c46e347a.webp",
+    "full": {
+      "wall": 26.401627165992977,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 14.901022417005152,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/11032026/sample_1a576b4d.webp",
+    "full": {
+      "wall": 25.254759624993312,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 14.753365249998751,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/12032026/sample_990e2dee.webp",
+    "full": {
+      "wall": 25.994105083009345,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 14.52361945901066,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/13032026/sample_fd26330f.webp",
+    "full": {
+      "wall": 23.50634379099938,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 14.320336042001145,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/16032026/sample_f683429f.webp",
+    "full": {
+      "wall": 21.82519350000075,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 14.021790291997604,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/17032026/sample_dd96d4f6.webp",
+    "full": {
+      "wall": 23.448171291995095,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.456584332991042,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/19032026/sample_29b704d7.webp",
+    "full": {
+      "wall": 22.01994549999654,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.731873583004926,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/20032026/sample_e3300c72.webp",
+    "full": {
+      "wall": 20.539559833006933,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.642662541999016,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "Histology staging images/Terminal staging/sample_8ccaa6bd.webp",
+    "full": {
+      "wall": 22.355441291991156,
+      "prompt_tokens": 7747,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.781804083002498,
+      "prompt_tokens": 3839,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_1/mouse5/mouse5D1.webp",
+    "full": {
+      "wall": 24.51260420800827,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 11.825402583010145,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_1/mouse8/mouse8D3.webp",
+    "full": {
+      "wall": 24.753869667008985,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.595707625005161,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_2/mouse2/mouse2D4.webp",
+    "full": {
+      "wall": 26.645835499992245,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.654363540990744,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_2/mouse6/mouse6D3.webp",
+    "full": {
+      "wall": 25.916402374990867,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.479366415995173,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_3/mouse2/mouse2D2.webp",
+    "full": {
+      "wall": 25.01796720799757,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "absent",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.644257209001807,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "absent",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_3/mouse5/mouse5D1.webp",
+    "full": {
+      "wall": 25.49201383399486,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.752911832998507,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_4/mouse2/mouse2D4.webp",
+    "full": {
+      "wall": 24.186381749997963,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 12.718060416998924,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_4/mouse5/mouse5D3.webp",
+    "full": {
+      "wall": 25.932652999996208,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "present",
+        "nucleated_epithelial": "present",
+        "leukocytes": "rare",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.238735416991403,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "absent",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  },
+  {
+    "image": "batch_5/mouse2/mouse2D1.webp",
+    "full": {
+      "wall": 24.76128599999356,
+      "prompt_tokens": 8843,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    },
+    "half": {
+      "wall": 13.402309832992614,
+      "prompt_tokens": 3643,
+      "calls": 2,
+      "stage": "estrus",
+      "conf": "low",
+      "qc": "usable",
+      "morph": {
+        "cornified_squames": "absent",
+        "nucleated_epithelial": "present",
+        "leukocytes": "present",
+        "nuclear_state": "mixed",
+        "arrangement": "mixed"
+      }
+    }
+  }
+]

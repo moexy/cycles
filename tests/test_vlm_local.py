@@ -229,3 +229,23 @@ def test_image_prediction_rejects_secondary_that_is_not_runner_up() -> None:
 
     with pytest.raises(ValueError, match="second-largest probability"):
         ImagePrediction.from_dict(payload)
+
+
+def test_quadrant_max_edge_caps_quadrants_and_leaves_overview_alone(tmp_path: Path) -> None:
+    """Vision prefill scales with pixel count, so quadrant size is the main cost lever."""
+    image_path = _sample_image(tmp_path / "slide.png")
+
+    full = build_view_pack(image_path)
+    capped = build_view_pack(image_path, quadrant_max_edge=20)
+
+    assert full[0].image.size == capped[0].image.size, "overview must be unaffected"
+    assert all(max(view.image.size) <= 20 for view in capped[1:])
+    assert all(max(view.image.size) > 20 for view in full[1:])
+    assert [view.label for view in capped] == [view.label for view in full]
+
+
+def test_quadrant_max_edge_rejects_nonpositive_values(tmp_path: Path) -> None:
+    image_path = _sample_image(tmp_path / "slide.png")
+
+    with pytest.raises(ValueError, match="quadrant_max_edge"):
+        build_view_pack(image_path, quadrant_max_edge=0)
