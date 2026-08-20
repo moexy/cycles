@@ -121,3 +121,31 @@ def test_reconciler_leaves_image_only_record_without_sequence_metadata() -> None
 
     assert reconciled[0].sequence_prediction.final_stage is EstrousStage.METESTRUS
     assert reconciled[0].sequence_prediction.reason == "no_sequence_metadata"
+
+
+def test_reconciler_handles_day_gaps() -> None:
+    # Gap of 2 days: Proestrus on Day 1 -> Metestrus expected by Day 3
+    records = [
+        _record("d1", 1, EstrousStage.PROESTRUS, EstrousStage.ESTRUS, _probs(p=0.90, e=0.07)),
+        _record("d3", 3, EstrousStage.ESTRUS, EstrousStage.METESTRUS, _probs(e=0.46, m=0.44, p=0.05, d=0.05)),
+        _record("d4", 4, EstrousStage.DIESTRUS, EstrousStage.METESTRUS, _probs(d=0.90, m=0.07)),
+    ]
+
+    reconciled = TemporalReconciler(margin_threshold=0.10).reconcile(records)
+
+    assert reconciled[1].sequence_prediction.final_stage is EstrousStage.METESTRUS
+    assert reconciled[1].sequence_prediction.adjusted is True
+
+
+def test_reconciler_handles_same_day_replicates() -> None:
+    # Multiple images on same day (Day 1): should reinforce stage consistency
+    records = [
+        _record("d1_spot1", 1, EstrousStage.ESTRUS, EstrousStage.PROESTRUS, _probs(e=0.90, p=0.07)),
+        _record("d1_spot2", 1, EstrousStage.PROESTRUS, EstrousStage.ESTRUS, _probs(p=0.46, e=0.44, m=0.05, d=0.05)),
+    ]
+
+    reconciled = TemporalReconciler(margin_threshold=0.10).reconcile(records)
+
+    assert reconciled[1].sequence_prediction.final_stage is EstrousStage.ESTRUS
+    assert reconciled[1].sequence_prediction.adjusted is True
+

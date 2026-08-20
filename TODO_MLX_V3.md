@@ -114,7 +114,8 @@
 - [x] Add interruption-safe resume/checkpoint behavior for large local inference folders.
   Implemented `--resume` in `cycles vlm-local`, streaming individual predictions to disk as completed
   and recovering seamlessly from partial or interrupted runs.
-- [ ] Decide and validate how temporal reconciliation handles repeated observations and irregular
-  day gaps; the current transition matrix advances once per record, not once per elapsed day.
+- [x] Decide and validate how temporal reconciliation handles repeated observations and irregular
+  day gaps; the transition matrix computes matrix powers $T^{\Delta t}$ for multi-day gaps and
+  high self-transition identity matrices for $\Delta t = 0$ same-day replicates.
 - [ ] Reassess multi-image SFT only after the upstream Qwen3-VL collation issue is demonstrably fixed.
 - [ ] Reconsider cell detection only after representative cell-level annotations exist.

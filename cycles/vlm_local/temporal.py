@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
+import numpy as np
+
 from cycles.core.cycle import STAGE_CYCLE_ORDER, TRANSITION_MATRIX
 from cycles.core.types import EstrousStage
 from cycles.vlm_local.schema import LocalVLMRecord, SequencePrediction
@@ -77,6 +79,24 @@ class TemporalReconciler:
         )
 
 
+def _transition_matrix_for_delta(delta_days: float) -> np.ndarray:
+    dt = max(0.0, float(delta_days))
+    steps = int(round(dt))
+    if steps == 0:
+        return np.array(
+            [
+                [0.97, 0.01, 0.01, 0.01],
+                [0.01, 0.97, 0.01, 0.01],
+                [0.01, 0.01, 0.97, 0.01],
+                [0.01, 0.01, 0.01, 0.97],
+            ],
+            dtype=np.float64,
+        )
+    if steps == 1:
+        return TRANSITION_MATRIX
+    return np.linalg.matrix_power(TRANSITION_MATRIX, steps)
+
+
 def _viterbi(records: list[LocalVLMRecord]) -> tuple[list[EstrousStage], float]:
     stages = STAGE_CYCLE_ORDER
     epsilon = 1e-12
@@ -85,13 +105,19 @@ def _viterbi(records: list[LocalVLMRecord]) -> tuple[list[EstrousStage], float]:
         for stage in stages
     ]
     backpointers: list[list[int]] = []
-    for record in records[1:]:
+    for prev_record, record in zip(records[:-1], records[1:], strict=True):
+        dt = (
+            (record.day - prev_record.day)
+            if (record.day is not None and prev_record.day is not None)
+            else 1.0
+        )
+        trans = _transition_matrix_for_delta(dt)
         next_scores: list[float] = []
         pointers: list[int] = []
         for destination_index, destination in enumerate(stages):
             candidates = [
                 previous_score
-                + math.log(max(float(TRANSITION_MATRIX[source_index, destination_index]), epsilon))
+                + math.log(max(float(trans[source_index, destination_index]), epsilon))
                 for source_index, previous_score in enumerate(scores)
             ]
             best_source = max(range(len(stages)), key=candidates.__getitem__)
@@ -124,11 +150,18 @@ def _path_score(
             return float("-inf")
         total += math.log(max(record.image_prediction.probabilities.get(stage, 0.0), epsilon))
         if index:
+            prev_record = records[index - 1]
             previous = path[index - 1]
             if previous is None:
                 return float("-inf")
+            dt = (
+                (record.day - prev_record.day)
+                if (record.day is not None and prev_record.day is not None)
+                else 1.0
+            )
+            trans = _transition_matrix_for_delta(dt)
             total += math.log(
-                max(float(TRANSITION_MATRIX[indices[previous], indices[stage]]), epsilon)
+                max(float(trans[indices[previous], indices[stage]]), epsilon)
             )
     return total
 
