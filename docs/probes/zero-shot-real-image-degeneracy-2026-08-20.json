@@ -1,0 +1,300 @@
+{
+  "agreement": {
+    "all_three": {
+      "agree": 1,
+      "n": 24
+    },
+    "gemma-3-12b-4bit vs qwen3-vl-4b-8bit": {
+      "agree": 3,
+      "n": 24
+    },
+    "gemma-3-12b-4bit vs qwen3-vl-8b-4bit": {
+      "agree": 16,
+      "n": 24
+    },
+    "qwen3-vl-4b-8bit vs qwen3-vl-8b-4bit": {
+      "agree": 3,
+      "n": 24
+    }
+  },
+  "disclaimer": "This measures output variation, NOT accuracy. No teacher labels exist for these images. A model that varies may still be systematically wrong; a modal stage may reflect a real base rate. Nothing here adjudicates which model is correct.",
+  "image_set": {
+    "images": [
+      "BulkRNA staging images/090426/sample_01254754.webp",
+      "BulkRNA staging images/100426/sample_3ef38d9b.webp",
+      "BulkRNA staging images/130426/sample_578a6218.webp",
+      "Histology staging images/05032026/sample_1b29c359.webp",
+      "Histology staging images/05032026/sample_e5f7a845.webp",
+      "Histology staging images/06032026/sample_ea790a5d.webp",
+      "Histology staging images/09032026/sample_c46e347a.webp",
+      "Histology staging images/11032026/sample_1a576b4d.webp",
+      "Histology staging images/12032026/sample_990e2dee.webp",
+      "Histology staging images/13032026/sample_fd26330f.webp",
+      "Histology staging images/16032026/sample_f683429f.webp",
+      "Histology staging images/17032026/sample_dd96d4f6.webp",
+      "Histology staging images/19032026/sample_29b704d7.webp",
+      "Histology staging images/20032026/sample_e3300c72.webp",
+      "Histology staging images/Terminal staging/sample_8ccaa6bd.webp",
+      "batch_1/mouse5/mouse5D1.webp",
+      "batch_1/mouse8/mouse8D3.webp",
+      "batch_2/mouse2/mouse2D4.webp",
+      "batch_2/mouse6/mouse6D3.webp",
+      "batch_3/mouse2/mouse2D2.webp",
+      "batch_3/mouse5/mouse5D1.webp",
+      "batch_4/mouse2/mouse2D4.webp",
+      "batch_4/mouse5/mouse5D3.webp",
+      "batch_5/mouse2/mouse2D1.webp"
+    ],
+    "n": 24,
+    "note": "identical to the images used in the view-pack resolution ablation",
+    "role": "non-held-out training partition, stage-blind",
+    "root": "/Volumes/SSD/Imaging/Cycles/dataset_split/train"
+  },
+  "models": {
+    "gemma-3-12b-4bit": {
+      "constant_field_count": "1/8",
+      "constant_fields": [
+        "qc"
+      ],
+      "distinct_stages": 4,
+      "distributions": {
+        "arrangement": {
+          "clusters": 13,
+          "isolated": 10,
+          "mixed": 1
+        },
+        "confidence": {
+          "high": 22,
+          "medium": 2
+        },
+        "cornified_squames": {
+          "absent": 8,
+          "present": 11,
+          "rare": 5
+        },
+        "leukocytes": {
+          "dominant": 1,
+          "present": 13,
+          "rare": 10
+        },
+        "nuclear_state": {
+          "clear_nuclei": 20,
+          "ghost_nuclei": 1,
+          "mixed": 3
+        },
+        "nucleated_epithelial": {
+          "dominant": 17,
+          "present": 6,
+          "rare": 1
+        },
+        "qc": {
+          "usable": 24
+        },
+        "stage": {
+          "diestrus": 2,
+          "estrus": 3,
+          "metestrus": 2,
+          "proestrus": 17
+        }
+      },
+      "modal_stage": "proestrus",
+      "modal_stage_count": 17,
+      "per_image_stage": {
+        "BulkRNA staging images/090426/sample_01254754.webp": "proestrus",
+        "BulkRNA staging images/100426/sample_3ef38d9b.webp": "metestrus",
+        "BulkRNA staging images/130426/sample_578a6218.webp": "proestrus",
+        "Histology staging images/05032026/sample_1b29c359.webp": "estrus",
+        "Histology staging images/05032026/sample_e5f7a845.webp": "proestrus",
+        "Histology staging images/06032026/sample_ea790a5d.webp": "proestrus",
+        "Histology staging images/09032026/sample_c46e347a.webp": "estrus",
+        "Histology staging images/11032026/sample_1a576b4d.webp": "diestrus",
+        "Histology staging images/12032026/sample_990e2dee.webp": "diestrus",
+        "Histology staging images/13032026/sample_fd26330f.webp": "proestrus",
+        "Histology staging images/16032026/sample_f683429f.webp": "proestrus",
+        "Histology staging images/17032026/sample_dd96d4f6.webp": "proestrus",
+        "Histology staging images/19032026/sample_29b704d7.webp": "metestrus",
+        "Histology staging images/20032026/sample_e3300c72.webp": "proestrus",
+        "Histology staging images/Terminal staging/sample_8ccaa6bd.webp": "proestrus",
+        "batch_1/mouse5/mouse5D1.webp": "proestrus",
+        "batch_1/mouse8/mouse8D3.webp": "estrus",
+        "batch_2/mouse2/mouse2D4.webp": "proestrus",
+        "batch_2/mouse6/mouse6D3.webp": "proestrus",
+        "batch_3/mouse2/mouse2D2.webp": "proestrus",
+        "batch_3/mouse5/mouse5D1.webp": "proestrus",
+        "batch_4/mouse2/mouse2D4.webp": "proestrus",
+        "batch_4/mouse5/mouse5D3.webp": "proestrus",
+        "batch_5/mouse2/mouse2D1.webp": "proestrus"
+      },
+      "provenance": {
+        "adapter_hash": "none",
+        "calibrator_hash": "97175498a239771909b7e83bad41d8aa1e395a29ef2232b71576ba3bb73dcf3c",
+        "model_id": "mlx-community/gemma-3-12b-it-4bit",
+        "model_revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558",
+        "prompt_prefix_reuse": "on",
+        "prompt_version": "morphology-first-v3",
+        "schema_version": "3.0",
+        "software_lock_hash": "08f98edb9b3403181893dc043a53e6f81cc79feb47f49df330e26ee56f7f6563",
+        "view_pack_version": "overview-quadrants-v1"
+      },
+      "source": "docs/probes/gemma-3-12b-4bit-real-image-degeneracy-2026-08-20.jsonl"
+    },
+    "qwen3-vl-4b-8bit": {
+      "constant_field_count": "6/8",
+      "constant_fields": [
+        "stage",
+        "confidence",
+        "qc",
+        "nucleated_epithelial",
+        "nuclear_state",
+        "arrangement"
+      ],
+      "distinct_stages": 1,
+      "distributions": {
+        "arrangement": {
+          "mixed": 24
+        },
+        "confidence": {
+          "low": 24
+        },
+        "cornified_squames": {
+          "absent": 13,
+          "present": 11
+        },
+        "leukocytes": {
+          "absent": 1,
+          "present": 17,
+          "rare": 6
+        },
+        "nuclear_state": {
+          "mixed": 24
+        },
+        "nucleated_epithelial": {
+          "present": 24
+        },
+        "qc": {
+          "usable": 24
+        },
+        "stage": {
+          "estrus": 24
+        }
+      },
+      "modal_stage": "estrus",
+      "modal_stage_count": 24,
+      "per_image_stage": {
+        "BulkRNA staging images/090426/sample_01254754.webp": "estrus",
+        "BulkRNA staging images/100426/sample_3ef38d9b.webp": "estrus",
+        "BulkRNA staging images/130426/sample_578a6218.webp": "estrus",
+        "Histology staging images/05032026/sample_1b29c359.webp": "estrus",
+        "Histology staging images/05032026/sample_e5f7a845.webp": "estrus",
+        "Histology staging images/06032026/sample_ea790a5d.webp": "estrus",
+        "Histology staging images/09032026/sample_c46e347a.webp": "estrus",
+        "Histology staging images/11032026/sample_1a576b4d.webp": "estrus",
+        "Histology staging images/12032026/sample_990e2dee.webp": "estrus",
+        "Histology staging images/13032026/sample_fd26330f.webp": "estrus",
+        "Histology staging images/16032026/sample_f683429f.webp": "estrus",
+        "Histology staging images/17032026/sample_dd96d4f6.webp": "estrus",
+        "Histology staging images/19032026/sample_29b704d7.webp": "estrus",
+        "Histology staging images/20032026/sample_e3300c72.webp": "estrus",
+        "Histology staging images/Terminal staging/sample_8ccaa6bd.webp": "estrus",
+        "batch_1/mouse5/mouse5D1.webp": "estrus",
+        "batch_1/mouse8/mouse8D3.webp": "estrus",
+        "batch_2/mouse2/mouse2D4.webp": "estrus",
+        "batch_2/mouse6/mouse6D3.webp": "estrus",
+        "batch_3/mouse2/mouse2D2.webp": "estrus",
+        "batch_3/mouse5/mouse5D1.webp": "estrus",
+        "batch_4/mouse2/mouse2D4.webp": "estrus",
+        "batch_4/mouse5/mouse5D3.webp": "estrus",
+        "batch_5/mouse2/mouse2D1.webp": "estrus"
+      },
+      "provenance": null,
+      "source": "docs/ablation-quadrant-resolution-2026-08-20.json (full-resolution condition)"
+    },
+    "qwen3-vl-8b-4bit": {
+      "constant_field_count": "1/8",
+      "constant_fields": [
+        "qc"
+      ],
+      "distinct_stages": 3,
+      "distributions": {
+        "arrangement": {
+          "isolated": 2,
+          "mixed": 22
+        },
+        "confidence": {
+          "low": 20,
+          "medium": 4
+        },
+        "cornified_squames": {
+          "absent": 7,
+          "dominant": 1,
+          "present": 8,
+          "rare": 8
+        },
+        "leukocytes": {
+          "absent": 14,
+          "rare": 10
+        },
+        "nuclear_state": {
+          "clear_nuclei": 1,
+          "mixed": 23
+        },
+        "nucleated_epithelial": {
+          "dominant": 2,
+          "present": 22
+        },
+        "qc": {
+          "usable": 24
+        },
+        "stage": {
+          "estrus": 3,
+          "metestrus": 1,
+          "proestrus": 20
+        }
+      },
+      "modal_stage": "proestrus",
+      "modal_stage_count": 20,
+      "per_image_stage": {
+        "BulkRNA staging images/090426/sample_01254754.webp": "proestrus",
+        "BulkRNA staging images/100426/sample_3ef38d9b.webp": "proestrus",
+        "BulkRNA staging images/130426/sample_578a6218.webp": "proestrus",
+        "Histology staging images/05032026/sample_1b29c359.webp": "proestrus",
+        "Histology staging images/05032026/sample_e5f7a845.webp": "proestrus",
+        "Histology staging images/06032026/sample_ea790a5d.webp": "proestrus",
+        "Histology staging images/09032026/sample_c46e347a.webp": "metestrus",
+        "Histology staging images/11032026/sample_1a576b4d.webp": "proestrus",
+        "Histology staging images/12032026/sample_990e2dee.webp": "proestrus",
+        "Histology staging images/13032026/sample_fd26330f.webp": "proestrus",
+        "Histology staging images/16032026/sample_f683429f.webp": "proestrus",
+        "Histology staging images/17032026/sample_dd96d4f6.webp": "proestrus",
+        "Histology staging images/19032026/sample_29b704d7.webp": "proestrus",
+        "Histology staging images/20032026/sample_e3300c72.webp": "proestrus",
+        "Histology staging images/Terminal staging/sample_8ccaa6bd.webp": "proestrus",
+        "batch_1/mouse5/mouse5D1.webp": "proestrus",
+        "batch_1/mouse8/mouse8D3.webp": "estrus",
+        "batch_2/mouse2/mouse2D4.webp": "estrus",
+        "batch_2/mouse6/mouse6D3.webp": "proestrus",
+        "batch_3/mouse2/mouse2D2.webp": "proestrus",
+        "batch_3/mouse5/mouse5D1.webp": "proestrus",
+        "batch_4/mouse2/mouse2D4.webp": "proestrus",
+        "batch_4/mouse5/mouse5D3.webp": "proestrus",
+        "batch_5/mouse2/mouse2D1.webp": "estrus"
+      },
+      "provenance": {
+        "adapter_hash": "none",
+        "calibrator_hash": "97175498a239771909b7e83bad41d8aa1e395a29ef2232b71576ba3bb73dcf3c",
+        "model_id": "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+        "model_revision": "defcdea7cc7a4b0858fea563cbbce171d328e457",
+        "prompt_prefix_reuse": "on",
+        "prompt_version": "morphology-first-v3",
+        "schema_version": "3.0",
+        "software_lock_hash": "08f98edb9b3403181893dc043a53e6f81cc79feb47f49df330e26ee56f7f6563",
+        "view_pack_version": "overview-quadrants-v1"
+      },
+      "source": "docs/probes/qwen3-vl-8b-4bit-real-image-degeneracy-2026-08-20.jsonl"
+    }
+  },
+  "probe_type": "real_image_zero_shot_degeneracy",
+  "prompt_prefix_reuse": "on",
+  "prompt_version": "morphology-first-v3",
+  "question": "Does the candidate's zero-shot output vary with the image, or is it a constant predictor?"
+}

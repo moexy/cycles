@@ -193,6 +193,31 @@ Which call is correct cannot be settled without labels.
 `build_view_pack(..., quadrant_max_edge=N)` exists and is tested. **The default is unchanged.** Do not
 lower resolution until teacher labels allow this to be re-run as an accuracy comparison.
 
+### 5.1 The constant predictor is the 4B, not the family
+
+The ablation above left open whether any candidate could stage zero-shot at all. That has now been
+tested directly on the same 24 images under prompt v3, and the degeneracy does not generalize. Full
+report: [`docs/zero-shot-real-image-degeneracy-2026-08-20.md`](zero-shot-real-image-degeneracy-2026-08-20.md).
+
+```text
+                      4B 8-bit          8B 4-bit           12B 4-bit
+distinct stages       1 (estrus 24)     3 (proestrus 20)   4 (proestrus 17)
+constant fields       6 of 8            1 of 8             1 of 8
+agreement             4B/8B 3/24        4B/12B 3/24        8B/12B 16/24
+```
+
+This probe measures **output variation, not accuracy**. No labels exist for these images, so it
+cannot say which model is right. It was needed because the controlled counterfactual probe supplies
+the morphology in text and therefore cannot detect a pass 1 that ignores the image — a model can
+score 4/4 there and still be a constant predictor on real slides, which is exactly what the 4B is.
+
+Two findings carry into the annotation pass:
+
+- **The 8B cannot reach diestrus.** It scores leukocytes `rare` or `absent` on all 24 images, never
+  `present`/`dominant`, and predicts diestrus 0/24. The 4B has the opposite bias (`present` 17/24).
+  The candidates disagree systematically on the field that most discriminates stage.
+- **The 12B confidence tier is uncalibrated.** `high` on 22/24 with no accuracy evidence behind it.
+
 ---
 
 ## 6. Why the pipeline uses two passes

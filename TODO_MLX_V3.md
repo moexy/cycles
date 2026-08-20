@@ -44,8 +44,23 @@
   defines the cytology criteria and asks only for relative evidence scores plus rationale; Qwen3-VL
   4B, Qwen3-VL 8B, and Gemma 3 12B each produce 4/4 valid, 4/4 matching controlled outputs. Raw
   artifacts are in `docs/probes/`. This proves contract compliance, not real-image accuracy.
+- [x] Establish whether the constant-predictor behavior is general or specific to one candidate. It
+  is specific. On the same 24 stage-blind training images under prompt v3, Qwen3-VL 4B 8-bit holds
+  6 of 8 output fields constant and returns `estrus` every time, while Qwen3-VL 8B 4-bit (3 distinct
+  stages) and Gemma 3 12B 4-bit (all 4 stages) vary on every field except QC. Agreement: 4B vs 8B
+  3/24, 4B vs 12B 3/24, 8B vs 12B 16/24. This measures output variation, not accuracy. Report:
+  `docs/zero-shot-real-image-degeneracy-2026-08-20.md`; raw data in `docs/probes/`.
 - [ ] Rerun a small labeled, non-held-out real-image comparison under prompt v3 before committing to
   the full bakeoff. Do not infer accuracy from the controlled counterfactual probe.
+- [ ] Do not carry Qwen3-VL 4B 8-bit into the bakeoff as a staging candidate on current evidence.
+  Whether it recovers after fine-tuning is a separate question the degeneracy probe does not answer.
+- [ ] Investigate the 8B leukocyte floor before annotation. It scores leukocytes `rare` or `absent`
+  on all 24 images and never `present`/`dominant`, so it cannot reach diestrus, which it predicts
+  0/24 times. The 4B has the opposite bias (`present` on 17/24). This is the field that most
+  discriminates stage and the two candidates disagree systematically on it.
+- [ ] Treat the 12B confidence tier as uncalibrated. It returns `high` on 22/24 images with no
+  accuracy evidence behind it; a confidently wrong teacher propagates error faster than an
+  uncertain one.
 - [ ] Decide the view-pack resolution/accuracy tradeoff before the bakeoff. The pack sends 8.81 MP
   (a 1536-edge overview plus four full-resolution quadrants) from a 2880x2048 source, which is
   8,843 tokens and ~16 s of the remaining 21 s. Halving the quadrant edge would cut that roughly
