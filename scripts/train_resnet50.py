@@ -6,8 +6,8 @@ import argparse
 import time
 from pathlib import Path
 
-from cycles.core.models import get_device
-from cycles.stages.cnn import CNNTrainerService, CNNTrainingConfig
+from cyclonaut.core.models import get_device
+from cyclonaut.stages.cnn import CNNTrainerService, CNNTrainingConfig
 
 
 def main() -> int:

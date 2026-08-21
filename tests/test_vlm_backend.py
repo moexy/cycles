@@ -7,7 +7,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 from PIL import Image
 
-from cycles.vlm_local.backend import MLXVLMBackend
+from cyclonaut.vlm_local.backend import MLXVLMBackend
 
 IMAGE_TOKEN = "<|image_pad|>"
 REVISION = "a" * 40

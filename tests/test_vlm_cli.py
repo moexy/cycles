@@ -9,14 +9,14 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-import cycles.cli.main as cli
+import cyclonaut.cli.main as cli
 
 REVISION = "a" * 40
 
 
 def _dummy_record(image_path: Path) -> Any:
-    from cycles.core.types import EstrousStage
-    from cycles.vlm_local.schema import (
+    from cyclonaut.core.types import EstrousStage
+    from cyclonaut.vlm_local.schema import (
         Abundance,
         Arrangement,
         ConfidenceTier,
@@ -255,7 +255,7 @@ def test_vlm_local_resume_skips_existing_records(tmp_path: Path, monkeypatch) ->
     }
     output.write_text(json.dumps(rec1) + "\n", encoding="utf-8")
 
-    from cycles.vlm_local.schema import LocalVLMRecord
+    from cyclonaut.vlm_local.schema import LocalVLMRecord
     rec2 = LocalVLMRecord.from_dict({**rec1, "sample_id": "img2", "image_path": str((folder / "img2.png").resolve())})
 
     pipeline = MagicMock()

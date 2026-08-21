@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from cycles.core.types import EstrousStage
-from cycles.vlm_local.calibration import TemperatureCalibrator
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.vlm_local.calibration import TemperatureCalibrator
 
 
 def test_temperature_calibrator_transforms_all_four_logits() -> None:
@@ -66,7 +66,7 @@ def test_temperature_calibrator_rejects_non_finite_scores(invalid: float) -> Non
 
 
 def test_fit_and_freeze_calibrator_saves_calibrator_file(tmp_path: Path) -> None:
-    from cycles.vlm_local.calibration import fit_and_freeze_calibrator
+    from cyclonaut.vlm_local.calibration import fit_and_freeze_calibrator
 
     predictions_path = tmp_path / "val_predictions.jsonl"
     labels_path = tmp_path / "val_labels.csv"

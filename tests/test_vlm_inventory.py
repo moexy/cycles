@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from cycles.vlm_local.inventory import build_blind_inventory
+from cyclonaut.vlm_local.inventory import build_blind_inventory
 
 
 def _image(path: Path, color: str) -> None:

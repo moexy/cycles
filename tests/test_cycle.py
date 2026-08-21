@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 
-from cycles.core.cycle import (
+from cyclonaut.core.cycle import (
     STAGE_CYCLE_ORDER,
     TRANSITION_MATRIX,
     compute_confidence_index,
@@ -14,7 +14,7 @@ from cycles.core.cycle import (
     fit_cyclicity,
     generate_cycle_plot_data,
 )
-from cycles.core.types import EstrousStage
+from cyclonaut.core.types import EstrousStage
 
 
 def test_cycle_order_and_transition_matrix_are_valid() -> None:

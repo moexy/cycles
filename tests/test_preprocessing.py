@@ -7,7 +7,7 @@ import pytest
 import torch
 from PIL import Image
 
-from cycles.core.preprocessing import (
+from cyclonaut.core.preprocessing import (
     discover_images,
     get_inference_transforms,
     get_train_transforms,

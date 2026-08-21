@@ -11,12 +11,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from cycles.vlm_local.calibration import TemperatureCalibrator
-from cycles.vlm_local.pipeline import _parse_json_object, calibrate_stage_evidence
-from cycles.vlm_local.probes import PROBE_DISCLAIMER, morphology_sensitivity_cases
-from cycles.vlm_local.prompts import PROMPT_VERSION, stage_prompt
-from cycles.vlm_local.schema import StageEvidence
-from cycles.vlm_local.views import VIEW_PACK_VERSION, build_view_pack
+from cyclonaut.vlm_local.calibration import TemperatureCalibrator
+from cyclonaut.vlm_local.pipeline import _parse_json_object, calibrate_stage_evidence
+from cyclonaut.vlm_local.probes import PROBE_DISCLAIMER, morphology_sensitivity_cases
+from cyclonaut.vlm_local.prompts import PROMPT_VERSION, stage_prompt
+from cyclonaut.vlm_local.schema import StageEvidence
+from cyclonaut.vlm_local.views import VIEW_PACK_VERSION, build_view_pack
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     if not image_path.is_file():
         raise FileNotFoundError(image_path)
 
-    from cycles.vlm_local.backend import MLXVLMBackend
+    from cyclonaut.vlm_local.backend import MLXVLMBackend
 
     backend = MLXVLMBackend(
         args.model,

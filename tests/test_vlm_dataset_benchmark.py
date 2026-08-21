@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from cycles.vlm_local.benchmark import benchmark_predictions
-from cycles.vlm_local.datasets import prepare_sft_dataset
+from cyclonaut.vlm_local.benchmark import benchmark_predictions
+from cyclonaut.vlm_local.datasets import prepare_sft_dataset
 
 
 def _png_bytes() -> bytes:

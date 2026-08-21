@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from cycles.core.types import EstrousStage
-from cycles.vlm_local.annotations import AnnotationStore, record_hash
-from cycles.vlm_local.schema import (
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.vlm_local.annotations import AnnotationStore, record_hash
+from cyclonaut.vlm_local.schema import (
     Abundance,
     Arrangement,
     ConfidenceTier,

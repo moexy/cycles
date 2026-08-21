@@ -7,8 +7,8 @@ import pytest
 import torch
 from torch import nn
 
-import cycles.core.models as model_utils
-from cycles.core.types import CheckpointMetadata
+import cyclonaut.core.models as model_utils
+from cyclonaut.core.types import CheckpointMetadata
 
 
 class TinyResNet(nn.Module):

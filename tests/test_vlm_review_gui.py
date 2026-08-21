@@ -10,10 +10,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 
-from cycles.core.types import EstrousStage
-from cycles.gui.vlm_review import VLMReviewWorkspace
-from cycles.vlm_local.annotations import AnnotationStore
-from cycles.vlm_local.schema import (
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.gui.vlm_review import VLMReviewWorkspace
+from cyclonaut.vlm_local.annotations import AnnotationStore
+from cyclonaut.vlm_local.schema import (
     Abundance,
     Arrangement,
     ConfidenceTier,

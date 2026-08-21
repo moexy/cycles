@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cycles.core.types import EstrousStage
-from cycles.vlm_local.schema import (
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.vlm_local.schema import (
     Abundance,
     Arrangement,
     ConfidenceTier,
@@ -12,7 +12,7 @@ from cycles.vlm_local.schema import (
     QCStatus,
     SequencePrediction,
 )
-from cycles.vlm_local.temporal import TemporalReconciler
+from cyclonaut.vlm_local.temporal import TemporalReconciler
 
 
 def _record(

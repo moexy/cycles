@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from cycles.eval.benchmark import BenchmarkHarness
-from cycles.eval.metrics import (
+from cyclonaut.eval.benchmark import BenchmarkHarness
+from cyclonaut.eval.metrics import (
     compute_classification_metrics,
     plot_confusion_matrix,
     plot_model_comparison,

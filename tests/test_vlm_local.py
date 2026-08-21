@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from cycles.core.types import EstrousStage
-from cycles.vlm_local.calibration import TemperatureCalibrator
-from cycles.vlm_local.pipeline import LocalVLMPipeline
-from cycles.vlm_local.prompts import PROMPT_VERSION, stage_prompt
-from cycles.vlm_local.schema import ImagePrediction, MorphologyObservation, QCStatus
-from cycles.vlm_local.views import build_view_pack
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.vlm_local.calibration import TemperatureCalibrator
+from cyclonaut.vlm_local.pipeline import LocalVLMPipeline
+from cyclonaut.vlm_local.prompts import PROMPT_VERSION, stage_prompt
+from cyclonaut.vlm_local.schema import ImagePrediction, MorphologyObservation, QCStatus
+from cyclonaut.vlm_local.views import build_view_pack
 
 
 class ScriptedBackend:

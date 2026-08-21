@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-import cycles.cli.main as cli
+import cyclonaut.cli.main as cli
 
 
 def test_argument_parser_recognizes_every_subcommand(tmp_path: Path) -> None:
@@ -120,9 +120,9 @@ def test_cell_centric_subcommand_invokes_pipeline(
     pipeline.process_folder.return_value = [object(), object()]
     pipeline.processing_errors = [(Path("bad.png"), "corrupt")]
     factory = MagicMock(return_value=pipeline)
-    fake_module = ModuleType("cycles.stages.cell_centric")
+    fake_module = ModuleType("cyclonaut.stages.cell_centric")
     fake_module.CellCentricPipeline = factory  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "cycles.stages.cell_centric", fake_module)
+    monkeypatch.setitem(sys.modules, "cyclonaut.stages.cell_centric", fake_module)
 
     status = cli.main(
         [
@@ -160,9 +160,9 @@ def test_mil_subcommand_invokes_pipeline(
     pipeline = MagicMock()
     pipeline.process_folder.return_value = batch
     factory = MagicMock(return_value=pipeline)
-    fake_module = ModuleType("cycles.stages.mil")
+    fake_module = ModuleType("cyclonaut.stages.mil")
     fake_module.AttentionMILPipeline = factory  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "cycles.stages.mil", fake_module)
+    monkeypatch.setitem(sys.modules, "cyclonaut.stages.mil", fake_module)
 
     status = cli.main(
         [
@@ -195,10 +195,10 @@ def test_cycle_fit_subcommand_writes_json(
     output = tmp_path / "nested" / "fit.json"
     fit_cyclicity = MagicMock(return_value={"regularity_score": 0.8, "mouse_id": "M7"})
     generate_cycle_plot_data = MagicMock()
-    fake_module = ModuleType("cycles.core.cycle")
+    fake_module = ModuleType("cyclonaut.core.cycle")
     fake_module.fit_cyclicity = fit_cyclicity  # type: ignore[attr-defined]
     fake_module.generate_cycle_plot_data = generate_cycle_plot_data  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "cycles.core.cycle", fake_module)
+    monkeypatch.setitem(sys.modules, "cyclonaut.core.cycle", fake_module)
     monkeypatch.setattr(
         cli,
         "_read_cycle_csv",
@@ -239,9 +239,9 @@ def test_evaluate_subcommand_invokes_benchmark_harness(
     plots = tmp_path / "plots"
     harness = MagicMock()
     factory = MagicMock(return_value=harness)
-    fake_module = ModuleType("cycles.eval.benchmark")
+    fake_module = ModuleType("cyclonaut.eval.benchmark")
     fake_module.BenchmarkHarness = factory  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "cycles.eval.benchmark", fake_module)
+    monkeypatch.setitem(sys.modules, "cyclonaut.eval.benchmark", fake_module)
 
     status = cli.main(
         [
@@ -277,7 +277,7 @@ def test_gui_help_exits_cleanly(capsys: pytest.CaptureFixture[str]) -> None:
 
     assert raised.value.code == 0
     help_text = capsys.readouterr().out
-    assert "usage: cycles gui" in help_text
+    assert "usage: cyclonaut gui" in help_text
     assert "--checkpoint" in help_text
 
 
@@ -301,7 +301,7 @@ def test_main_reports_subcommand_errors(
     )
 
     assert status == 1
-    assert "cycles: error: missing weights" in capsys.readouterr().err
+    assert "cyclonaut: error: missing weights" in capsys.readouterr().err
 
 
 def test_cycle_fit_reads_jsonl_input(
@@ -359,9 +359,9 @@ def test_stage_subcommand_invokes_cell_centric_engine(
     pipeline = MagicMock()
     pipeline.process_folder.return_value = [object()]
     factory = MagicMock(return_value=pipeline)
-    fake_module = ModuleType("cycles.stages.cell_centric")
+    fake_module = ModuleType("cyclonaut.stages.cell_centric")
     fake_module.CellCentricPipeline = factory  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "cycles.stages.cell_centric", fake_module)
+    monkeypatch.setitem(sys.modules, "cyclonaut.stages.cell_centric", fake_module)
 
     status = cli.main(
         [

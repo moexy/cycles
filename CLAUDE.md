@@ -1,4 +1,4 @@
-# cycles — working conventions
+# cyclonaut — working conventions
 
 ## Write in Markdown
 

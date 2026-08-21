@@ -30,8 +30,8 @@ def main(argv: list[str] | None = None) -> int:
 
     import mlx.core as mx
 
-    from cycles.vlm_local.backend import MLXVLMBackend
-    from cycles.vlm_local.pipeline import LocalVLMPipeline
+    from cyclonaut.vlm_local.backend import MLXVLMBackend
+    from cyclonaut.vlm_local.pipeline import LocalVLMPipeline
 
     mx.reset_peak_memory()
     load_started = time.perf_counter()

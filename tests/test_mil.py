@@ -9,12 +9,12 @@ import torch
 from PIL import Image
 from torch import nn
 
-import cycles.stages.mil.encoder as encoder_module
-from cycles.core.types import EstrousStage
-from cycles.stages.mil.encoder import PatchEncoder
-from cycles.stages.mil.model import GatedAttentionMIL
-from cycles.stages.mil.patching import PatchExtractor, PatchInfo
-from cycles.stages.mil.pipeline import AttentionMILPipeline
+import cyclonaut.stages.mil.encoder as encoder_module
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.stages.mil.encoder import PatchEncoder
+from cyclonaut.stages.mil.model import GatedAttentionMIL
+from cyclonaut.stages.mil.patching import PatchExtractor, PatchInfo
+from cyclonaut.stages.mil.pipeline import AttentionMILPipeline
 
 
 def test_patch_extractor_tiles_image_and_preserves_spatial_metadata() -> None:

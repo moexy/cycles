@@ -10,9 +10,9 @@ import torch
 from PIL import Image
 from torch import nn
 
-import cycles.stages.cnn as cnn_module
-from cycles.core.types import EstrousStage
-from cycles.stages.cnn import CNNClassifierService, CNNTrainerService, CNNTrainingConfig
+import cyclonaut.stages.cnn as cnn_module
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.stages.cnn import CNNClassifierService, CNNTrainerService, CNNTrainingConfig
 
 
 class ConstantLogitModel(nn.Module):

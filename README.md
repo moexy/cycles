@@ -1,4 +1,4 @@
-# cycles
+# cyclonaut
 
 Automated rodent estrous phase staging and longitudinal cyclicity analysis from vaginal cytology images.
 
@@ -12,13 +12,13 @@ uv sync --extra mlx
 
 ```bash
 # Stage a slide or longitudinal subject folder and plot the cycle timeline:
-uv run cycles stage \
+uv run cyclonaut stage \
   --input path/to/images/ \
   --output runs/results.jsonl \
   --csv runs/results.csv \
   --plot runs/timeline.png
 
 # Launch the desktop review GUI:
-uv run cycles-gui
+uv run cyclonaut-gui
 ```
 

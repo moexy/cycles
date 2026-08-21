@@ -8,11 +8,11 @@ import pytest
 from PIL import Image
 from skimage.draw import disk
 
-from cycles.core.types import CellProfile, CellType, EstrousStage, SlideCellMetrics
-from cycles.stages.cell_centric.classifier import CellClassifier
-from cycles.stages.cell_centric.detector import CellDetector
-from cycles.stages.cell_centric.pipeline import CellCentricPipeline
-from cycles.stages.cell_centric.staging import classify_stage_calibrated_rules, determine_stage
+from cyclonaut.core.types import CellProfile, CellType, EstrousStage, SlideCellMetrics
+from cyclonaut.stages.cell_centric.classifier import CellClassifier
+from cyclonaut.stages.cell_centric.detector import CellDetector
+from cyclonaut.stages.cell_centric.pipeline import CellCentricPipeline
+from cyclonaut.stages.cell_centric.staging import classify_stage_calibrated_rules, determine_stage
 
 
 def _profile(

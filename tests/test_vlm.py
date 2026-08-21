@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from cycles.core.types import EstrousStage
-from cycles.stages.vlm import VLMConfig, VLMInterpretationService
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.stages.vlm import VLMConfig, VLMInterpretationService
 
 
 @pytest.fixture

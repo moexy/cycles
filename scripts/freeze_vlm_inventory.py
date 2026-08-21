@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from cycles.vlm_local.inventory import build_blind_inventory
+from cyclonaut.vlm_local.inventory import build_blind_inventory
 
 
 def build_parser() -> argparse.ArgumentParser:

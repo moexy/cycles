@@ -13,9 +13,9 @@ from PIL import Image
 from PySide6.QtWidgets import QApplication, QToolBar
 from pytestqt.qtbot import QtBot
 
-from cycles.gui.canvas import CycleTimelineCanvas, ImageOverlayCanvas
-from cycles.gui.main_window import MainWindow
-from cycles.gui.workers import ClassificationWorker
+from cyclonaut.gui.canvas import CycleTimelineCanvas, ImageOverlayCanvas
+from cyclonaut.gui.main_window import MainWindow
+from cyclonaut.gui.workers import ClassificationWorker
 
 
 def _save_image(path: Path) -> Path:

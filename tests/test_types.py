@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from cycles.core.types import (
+from cyclonaut.core.types import (
     BatchClassificationResult,
     CellProfile,
     CellType,

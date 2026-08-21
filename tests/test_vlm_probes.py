@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cycles.core.types import EstrousStage
-from cycles.vlm_local.probes import PROBE_DISCLAIMER, morphology_sensitivity_cases
+from cyclonaut.core.types import EstrousStage
+from cyclonaut.vlm_local.probes import PROBE_DISCLAIMER, morphology_sensitivity_cases
 
 
 def test_morphology_sensitivity_probe_is_explicitly_not_ground_truth() -> None:
