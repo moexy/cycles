@@ -1,0 +1,15 @@
+{
+  "annotation_jsonl_sha256": "7c282449382661eee3fc0fde03dd5c807e7f9c7bd81c4b457dbd7261976e825e",
+  "completed_records": 228,
+  "inventory_records": 343,
+  "inventory_sha256": "6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f",
+  "last_completed_image_sha256": "b631fd13b19f07feafdee6ba1c13c9fb9ea9dcce7c44aab64f21ee2e37b5a64b",
+  "next_image_sha256": "b648b0fc97aa330cedde9a63cf8077fb5150cf4de70ae3c35490d6ac9ac0a702",
+  "remaining_records": 115,
+  "status": "paused",
+  "validation": {
+    "json_parse": true,
+    "sorted_prefix_match": true,
+    "unique_image_hashes": 228
+  }
+}

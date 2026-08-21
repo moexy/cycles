@@ -1,9 +1,9 @@
 # MLX-VLM v3 Engineering Handoff
 
-**Last updated:** 2026-08-20
+**Last updated:** 2026-08-21
 **Branch:** `feature/estrous-mlx-v3`
 **Source checkout:** `/Volumes/SSD/code/cycles` (active working tree)
-**Status:** The local VLM path runs natively on Apple Silicon Metal; all 191 unit and integration tests are passing (100% green). Operational hardening (calibrator freezing CLI, benchmark non-inferiority gates, crash-safe inference resumption, arbitrary day-gap Markov reconciliation, and GUI side-by-side transition adjudication) is complete and verified.
+**Status:** Engineering remains at the verified state below. A separate restricted, direct-vision teacher pass is paused cleanly at 228 / 343 hash-blinded training images; its provisional records and exact resume boundary are saved under `runs/restricted-image-only-native-vision-2026-08-21/`.
 
 ---
 
@@ -42,12 +42,12 @@ The command-line interface has been upgraded to provide a single, unified entry 
 
 See [`TODO_MLX_V3.md`](TODO_MLX_V3.md) for the full list. Ordered by dependency:
 
-1. **Fresh, stage-blind teacher annotation** in a restricted context with access only to
+1. **Finish the fresh, stage-blind teacher annotation.** The independent direct-vision pass is paused at 228 / 343 images. Resume at SHA-256 `b648b0fc97aa330cedde9a63cf8077fb5150cf4de70ae3c35490d6ac9ac0a702`; see `runs/restricted-image-only-native-vision-2026-08-21/HANDOFF.md`. The current JSONL checksum is a checkpoint only, not the final frozen annotation hash. Continue in a restricted context with access only to
    `/Volumes/SSD/Imaging/Cycles/dataset_split/train`. Before displaying an image, recompute the
    path-blind 343-image inventory and match aggregate SHA-256
    `6a7def23bcb8640d7694840541c00ec371e0ce0dc864cd5a485d375b8aa15a4f`. Then complete the image-only
    pass, hash the log, and only then expose subject/day ordering for the 141 longitudinal images.
-   The review UI is blinded by default; confirm `workspace.blinded` is `True` and that the toolbar reads `Blinded` before the first image is displayed.
+   Do not use the local review UI or any local inference/cell-analysis workflow for this restricted pass; inspect only the hash-named blinded image pixels directly. Current calls are provisional AI visual judgments, not expert truth.
 2. **Controlled Morphology & Leukocyte Floor Investigation**:
    Investigate the 8B leukocyte floor before annotation. It scores leukocytes `rare` or `absent`
    on all 24 probe images and never `present`/`dominant`, so it predicts diestrus 0/24 times (compared to 4B's `present` on 17/24).
